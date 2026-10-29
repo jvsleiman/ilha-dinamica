@@ -2,6 +2,9 @@ package com.jvsleiman.ilha
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.snap
@@ -74,7 +77,6 @@ fun Island(
     ui: UiState,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
-    onSettled: () -> Unit,
     onAction: (String) -> Unit,
 ) {
     val tap by rememberUpdatedState(onTap)
@@ -84,13 +86,11 @@ fun Island(
     val h by animateDpAsState(ui.h.dp, mola<Dp>(), label = "altura")
     val r by animateDpAsState(ui.r.dp, mola<Dp>(), label = "cantos")
 
-    // Quando a animação assenta, a janela encolhe para o tamanho exato
-    val assentou = w == ui.w.dp && h == ui.h.dp
-    LaunchedEffect(assentou, ui.modo) { if (assentou) onSettled() }
-
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
+                // Sempre centralizada na câmera, qualquer que seja a largura no momento
+                .offset { IntOffset((ui.cx - w.toPx() / 2f).roundToInt(), 0) }
                 .size(w, h)
                 .clip(RoundedCornerShape(r))
                 .background(Color.Black)

@@ -36,7 +36,12 @@ data class UiState(
     val r: Float = 15f,
     val music: MusicInfo? = null,
     val notif: NotifInfo? = null,
+    /** Centro horizontal da câmera, em pixels da tela. */
+    val cx: Float = 0f,
 )
+
+/** Altura da maior forma da ilha (música expandida), em dp. */
+const val MAX_H = 176f
 
 /** Quanto tempo a música pausada continua na ilha. */
 private const val PAUSA_VISIVEL_MS = 30_000L
@@ -46,8 +51,12 @@ private const val NOTIF_MS = 4_500L
 class IslandService : AccessibilityService() {
 
     private var wm: WindowManager? = null
+    // Janela de desenho: tamanho fixo, não recebe toques (passam para o que está embaixo).
     private var view: ComposeView? = null
     private var lp: WindowManager.LayoutParams? = null
+    // Janela de toque: invisível, do tamanho exato da ilha; repassa os toques ao desenho.
+    private var touch: View? = null
+    private var touchLp: WindowManager.LayoutParams? = null
     private val owner = OverlayOwner()
     private lateinit var prefs: SharedPreferences
 
@@ -85,38 +94,53 @@ class IslandService : AccessibilityService() {
                     ui = ui.value,
                     onTap = { tocar() },
                     onLongPress = { segurar() },
-                    onSettled = { applyLayout(grow = false) },
                     onAction = { acao(it) },
                 )
             }
+        }
+        val t = View(this).apply {
             setOnTouchListener { _, e ->
-                if (e.action == MotionEvent.ACTION_OUTSIDE && expanded) {
-                    expanded = false
-                    refresh()
+                if (e.action == MotionEvent.ACTION_OUTSIDE) {
+                    if (expanded) {
+                        expanded = false
+                        refresh()
+                    }
+                    return@setOnTouchListener false
                 }
-                false
+                // Converte a posição do toque para a janela de desenho e entrega ao Compose
+                val tl = touchLp
+                val dl = lp
+                if (tl != null && dl != null) {
+                    val ev = MotionEvent.obtain(e)
+                    ev.offsetLocation((tl.x - dl.x).toFloat(), (tl.y - dl.y).toFloat())
+                    view?.dispatchTouchEvent(ev)
+                    ev.recycle()
+                }
+                true
             }
         }
 
-        val params = WindowManager.LayoutParams(
+        fun base(flags: Int) = WindowManager.LayoutParams(
             1, 1,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or flags,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            title = "Ilha"
         }
+
         view = v
-        lp = params
+        lp = base(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE).apply { title = "Ilha" }
+        touch = t
+        touchLp = base(WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH).apply { title = "Ilha toque" }
         ui.value = computeUi()
-        computeWindow(grow = false)
-        manager.addView(v, params)
+        computeWindows()
+        manager.addView(v, lp)
+        manager.addView(t, touchLp)
         IslandBus.serviceOn.value = true
         IslandBus.log("Ilha conectada")
 
@@ -241,29 +265,33 @@ class IslandService : AccessibilityService() {
         val (w, h, r) = when (modo) {
             Modo.IDLE -> Triple(cfg.width, cfg.height, cfg.height / 2f)
             Modo.MUSIC_C -> Triple(cfg.width + 120f, cfg.height, cfg.height / 2f)
-            Modo.MUSIC_X -> Triple(largo, 176f, 42f)
+            Modo.MUSIC_X -> Triple(largo, MAX_H, 42f)
             Modo.NOTIF -> Triple(largo, 88f, 36f)
         }
-        return UiState(modo, w, h, r, m, notif)
+        return UiState(modo, w, h, r, m, notif, ui.value.cx)
     }
 
     private fun refresh() {
         ui.value = computeUi()
-        applyLayout(grow = true)
+        applyLayout()
     }
 
     /**
-     * grow = true: só aumenta a janela (antes de a animação crescer).
-     * grow = false: ajusta ao tamanho exato (quando a animação termina).
+     * A janela de desenho nunca muda de tamanho durante as animações (é isso que evitava o "pulo").
+     * Só a janela de toque, que é invisível, acompanha o tamanho da ilha.
      */
-    private fun computeWindow(grow: Boolean) {
+    private fun computeWindows() {
         val manager = wm ?: return
         val v = view ?: return
         val p = lp ?: return
+        val t = touch ?: return
+        val tp = touchLp ?: return
         val s = ui.value
 
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        v.visibility = if (cfg.enabled && !landscape) View.VISIBLE else View.GONE
+        val vis = if (cfg.enabled && !landscape) View.VISIBLE else View.GONE
+        v.visibility = vis
+        t.visibility = vis
 
         val metrics = manager.currentWindowMetrics
         val bounds = metrics.bounds
@@ -274,31 +302,35 @@ class IslandService : AccessibilityService() {
 
         val cx = (hole?.exactCenterX() ?: (bounds.width() / 2f)) + dp(cfg.offsetX)
         val cy = (hole?.exactCenterY() ?: (statusTop / 2f)) + dp(cfg.offsetY)
+        val top = (cy - dp(cfg.height) / 2f).roundToInt()
 
-        val wide = s.modo == Modo.MUSIC_X || s.modo == Modo.NOTIF
-        val targetW = if (wide) bounds.width() else dp(s.w + 16f).roundToInt()
-        val targetH = dp(s.h + 16f).roundToInt()
+        // Desenho: largura da tela, altura suficiente para a maior forma (+ folga da mola)
+        p.x = 0
+        p.y = top
+        p.width = bounds.width()
+        p.height = dp(MAX_H + 24f).roundToInt()
+        if (ui.value.cx != cx) ui.value = ui.value.copy(cx = cx)
 
-        val newW = if (grow) max(p.width, targetW) else targetW
-        val newH = if (grow) max(p.height, targetH) else targetH
-        p.width = newW
-        p.height = newH
-        p.x = (cx - newW / 2f).roundToInt()
-        p.y = (cy - dp(cfg.height) / 2f).roundToInt()
+        // Toque: exatamente onde a ilha vai ficar
+        val w = dp(s.w)
+        tp.width = w.roundToInt()
+        tp.height = dp(s.h).roundToInt()
+        tp.x = (cx - w / 2f).roundToInt()
+        tp.y = top
     }
 
-    private fun applyLayout(grow: Boolean) {
-        computeWindow(grow)
-        val v = view ?: return
-        val p = lp ?: return
-        if (v.isAttachedToWindow) wm?.updateViewLayout(v, p)
+    private fun applyLayout() {
+        computeWindows()
+        val manager = wm ?: return
+        view?.let { if (it.isAttachedToWindow) manager.updateViewLayout(it, lp) }
+        touch?.let { if (it.isAttachedToWindow) manager.updateViewLayout(it, touchLp) }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         expanded = false
         ui.value = computeUi()
-        applyLayout(grow = false)
+        applyLayout()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -310,7 +342,9 @@ class IslandService : AccessibilityService() {
     override fun onDestroy() {
         if (::prefs.isInitialized) prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         view?.let { v -> if (v.isAttachedToWindow) wm?.removeView(v) }
+        touch?.let { v -> if (v.isAttachedToWindow) wm?.removeView(v) }
         view = null
+        touch = null
         IslandBus.serviceOn.value = false
         owner.stop()
         super.onDestroy()
