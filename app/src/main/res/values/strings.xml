@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="acessibilidade_desc">Permite que a Ilha Dinâmica seja desenhada por cima da barra de status, em volta da câmera frontal. O app não lê o conteúdo das telas.</string>
+</resources>
