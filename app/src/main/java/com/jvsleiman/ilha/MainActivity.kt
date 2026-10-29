@@ -218,6 +218,7 @@ fun Tela(retorno: Int) {
                     Subtitulo("Com música")
                     Ajuste("Quanto estica", cfg.musicaExtra, 60f..220f, "dp") { salvar(cfg.copy(musicaExtra = it)) }
                     Subtitulo("Expandida (notificações e música)")
+                    Ajuste("Espaço acima da câmera", cfg.acima, 0f..24f, "dp") { salvar(cfg.copy(acima = it)) }
                     Ajuste("Espaço abaixo da câmera", cfg.respiro, 0f..40f, "dp") { salvar(cfg.copy(respiro = it)) }
                     Ajuste("Margem das laterais", cfg.margem, 4f..48f, "dp") { salvar(cfg.copy(margem = it)) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

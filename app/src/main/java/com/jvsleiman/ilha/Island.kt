@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -89,12 +90,13 @@ fun Island(
     val w by animateDpAsState(ui.w.dp, mola<Dp>(), label = "largura")
     val h by animateDpAsState(ui.h.dp, mola<Dp>(), label = "altura")
     val r by animateDpAsState(ui.r.dp, mola<Dp>(), label = "cantos")
+    val y by animateFloatAsState(ui.y, mola<Float>(), label = "topo")
 
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
                 // Sempre centralizada na câmera, qualquer que seja a largura no momento
-                .offset { IntOffset((ui.cx - w.toPx() / 2f).roundToInt(), 0) }
+                .offset { IntOffset((ui.cx - w.toPx() / 2f).roundToInt(), y.roundToInt()) }
                 .size(w, h)
                 .clip(RoundedCornerShape(r))
                 .background(Color.Black)
@@ -215,7 +217,9 @@ private fun MusicaExpandida(m: MusicInfo, topo: Float, onAction: (String) -> Uni
     val pos = m.currentPosition(agora)
 
     Column(
-        Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = topo.dp, bottom = 12.dp),
+        Modifier.fillMaxSize().padding(
+            start = MARGEM_INTERNA.dp, end = MARGEM_INTERNA.dp, top = topo.dp, bottom = MARGEM_INTERNA.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -321,7 +325,9 @@ private fun Icone(tipo: IconeTipo, tamanho: Dp) {
 @Composable
 private fun Notificacao(n: NotifInfo, topo: Float, aberta: Boolean, onAction: (String) -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = topo.dp, bottom = 14.dp),
+        Modifier.fillMaxSize().padding(
+            start = MARGEM_INTERNA.dp, end = MARGEM_INTERNA.dp, top = topo.dp, bottom = MARGEM_INTERNA.dp,
+        ),
     ) {
         Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
             val bmp = n.icon
@@ -334,7 +340,7 @@ private fun Notificacao(n: NotifInfo, topo: Float, aberta: Boolean, onAction: (S
             } else {
                 Box(Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)).background(Color(0xFF333333)))
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     n.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
@@ -351,15 +357,15 @@ private fun Notificacao(n: NotifInfo, topo: Float, aberta: Boolean, onAction: (S
             Text(n.app, color = Cinza, fontSize = 11.sp, maxLines = 1)
         }
         if (aberta && n.actions.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 n.actions.forEachIndexed { i, a ->
                     val responder = !a.remoteInputs.isNullOrEmpty()
                     Box(
                         Modifier
                             .weight(1f)
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(21.dp))
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(22.dp))
                             .background(if (responder) Color(0xFF0A84FF) else Color(0xFF2C2C2E))
                             .pointerInput(i) { detectTapGestures { onAction("acao:$i") } },
                         contentAlignment = Alignment.Center,

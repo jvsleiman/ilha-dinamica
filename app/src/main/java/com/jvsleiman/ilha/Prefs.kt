@@ -12,8 +12,10 @@ data class Config(
     val height: Float = 30f,
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
-    /** Espaço entre a faixa da câmera e o conteúdo expandido. */
-    val respiro: Float = 10f,
+    /** Espaço entre a câmera e o conteúdo expandido. */
+    val respiro: Float = 12f,
+    /** Quanto a forma expandida sobe acima da câmera. */
+    val acima: Float = 8f,
     /** Distância das bordas da tela quando expandida (cada lado). */
     val margem: Float = 12f,
     /** Quanto a ilha estica com música tocando. */
@@ -28,8 +30,8 @@ data class Favorito(val nome: String, val config: Config)
 /** Favoritos que já vêm no app. */
 val PRONTOS = listOf(
     Favorito("Padrão", Config()),
-    Favorito("Discreta", Config(width = 84f, height = 26f, respiro = 8f, margem = 16f, musicaExtra = 96f)),
-    Favorito("Grande", Config(width = 120f, height = 36f, respiro = 14f, margem = 10f, musicaExtra = 150f)),
+    Favorito("Discreta", Config(width = 84f, height = 26f, respiro = 10f, acima = 6f, margem = 16f, musicaExtra = 96f)),
+    Favorito("Grande", Config(width = 120f, height = 36f, respiro = 14f, acima = 10f, margem = 10f, musicaExtra = 150f)),
 )
 
 object Prefs {
@@ -45,6 +47,7 @@ object Prefs {
             offsetX = p.getFloat("offsetX", d.offsetX),
             offsetY = p.getFloat("offsetY", d.offsetY),
             respiro = p.getFloat("respiro", d.respiro),
+            acima = p.getFloat("acima", d.acima),
             margem = p.getFloat("margem", d.margem),
             musicaExtra = p.getFloat("musicaExtra", d.musicaExtra),
         )
@@ -58,6 +61,7 @@ object Prefs {
             .putFloat("offsetX", c.offsetX)
             .putFloat("offsetY", c.offsetY)
             .putFloat("respiro", c.respiro)
+            .putFloat("acima", c.acima)
             .putFloat("margem", c.margem)
             .putFloat("musicaExtra", c.musicaExtra)
             .apply()
@@ -72,6 +76,7 @@ object Prefs {
         put("offsetX", f.config.offsetX.toDouble())
         put("offsetY", f.config.offsetY.toDouble())
         put("respiro", f.config.respiro.toDouble())
+        put("acima", f.config.acima.toDouble())
         put("margem", f.config.margem.toDouble())
         put("musicaExtra", f.config.musicaExtra.toDouble())
     }
@@ -86,6 +91,7 @@ object Prefs {
                 offsetX = o.optDouble("offsetX", d.offsetX.toDouble()).toFloat(),
                 offsetY = o.optDouble("offsetY", d.offsetY.toDouble()).toFloat(),
                 respiro = o.optDouble("respiro", d.respiro.toDouble()).toFloat(),
+                acima = o.optDouble("acima", d.acima.toDouble()).toFloat(),
                 margem = o.optDouble("margem", d.margem.toDouble()).toFloat(),
                 musicaExtra = o.optDouble("musicaExtra", d.musicaExtra.toDouble()).toFloat(),
             ),

@@ -41,11 +41,17 @@ data class UiState(
     val cx: Float = 0f,
     /** Faixa livre no topo das formas expandidas (a altura da ilha parada + respiro), em dp. */
     val topo: Float = 38f,
+    /** Topo da forma, em pixels da tela (sobe quando expande). */
+    val y: Float = 0f,
 )
+
+/** Margem interna padrão das formas expandidas: laterais e base iguais, em dp. */
+const val MARGEM_INTERNA = 20f
+fun Modo.expandido() = this == Modo.MUSIC_X || this == Modo.NOTIF || this == Modo.NOTIF_X
 
 
 /** Altura da maior forma da ilha (música expandida), em dp. */
-const val MAX_H = 260f
+const val MAX_H = 300f
 
 /** Quanto tempo a música pausada continua na ilha. */
 private const val PAUSA_VISIVEL_MS = 30_000L
@@ -335,15 +341,17 @@ class IslandService : AccessibilityService() {
         if (modo == Modo.IDLE) expanded = false
         val largo = screenWidthDp() - 2f * cfg.margem
         // O conteúdo expandido começa abaixo da câmera
-        val topo = cfg.height + cfg.respiro
+        // Faixa do topo: folga acima da câmera + altura da câmera + espaço até o conteúdo
+        val topo = cfg.acima + cfg.height + cfg.respiro
+        val base = MARGEM_INTERNA
         val (w, h, r) = when (modo) {
             Modo.IDLE -> Triple(cfg.width, cfg.height, cfg.height / 2f)
             Modo.MUSIC_C -> Triple(cfg.width + cfg.musicaExtra, cfg.height, cfg.height / 2f)
-            Modo.MUSIC_X -> Triple(largo, topo + 154f, 42f)
-            Modo.NOTIF -> Triple(largo, topo + 66f, 36f)
-            Modo.NOTIF_X -> Triple(largo, topo + 120f, 38f)
+            Modo.MUSIC_X -> Triple(largo, topo + 142f + base, 44f)
+            Modo.NOTIF -> Triple(largo, topo + 52f + base, 40f)
+            Modo.NOTIF_X -> Triple(largo, topo + 52f + 16f + 44f + base, 44f)
         }
-        return UiState(modo, w, h, r, m, notif, ui.value.cx, topo)
+        return UiState(modo, w, h, r, m, notif, ui.value.cx, topo, ui.value.y)
     }
 
     private fun refresh() {
@@ -379,19 +387,25 @@ class IslandService : AccessibilityService() {
         val cy = (hole?.exactCenterY() ?: (statusTop / 2f)) + dp(cfg.offsetY)
         val top = (cy - dp(cfg.height) / 2f).roundToInt()
 
-        // Desenho: largura da tela, altura suficiente para a maior forma (+ folga da mola)
+        // Expandida, a forma sobe para envolver a câmera com uma folga acima
+        val topExp = (top - dp(cfg.acima)).coerceAtLeast(0f).roundToInt()
+        val y = if (s.modo.expandido()) topExp else top
+
+        // Desenho: do topo da tela, largura da tela, altura para a maior forma (+ folga da mola)
         p.x = 0
-        p.y = top
+        p.y = 0
         p.width = bounds.width()
-        p.height = dp(MAX_H + 24f).roundToInt()
-        if (ui.value.cx != cx) ui.value = ui.value.copy(cx = cx)
+        p.height = top + dp(MAX_H + 24f).roundToInt()
+        if (ui.value.cx != cx || ui.value.y != y.toFloat()) {
+            ui.value = ui.value.copy(cx = cx, y = y.toFloat())
+        }
 
         // Toque: exatamente onde a ilha vai ficar
         val w = dp(s.w)
         tp.width = w.roundToInt()
         tp.height = dp(s.h).roundToInt()
         tp.x = (cx - w / 2f).roundToInt()
-        tp.y = top
+        tp.y = y
     }
 
     private fun applyLayout() {
