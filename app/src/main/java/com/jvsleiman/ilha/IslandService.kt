@@ -65,8 +65,8 @@ const val MAX_H = 300f
 
 /** Quanto tempo a música pausada continua na ilha. */
 private const val PAUSA_VISIVEL_MS = 30_000L
-/** Quanto tempo o ícone de mensagem pendente fica ao lado da câmera. */
-private const val PENDENTE_MS = 60_000L
+/** Quanto tempo o ícone de mensagem fica ao lado da câmera antes de a ilha voltar ao normal. */
+private const val PENDENTE_MS = 3_000L
 /** Quanto tempo a faixa "nova mensagem" fica aberta. */
 private const val NOTIF_MS = 4_500L
 
