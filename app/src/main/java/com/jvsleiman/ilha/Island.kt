@@ -2,6 +2,8 @@ package com.jvsleiman.ilha
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import kotlin.math.abs
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
@@ -78,8 +80,10 @@ fun Island(
     onTap: () -> Unit,
     onLongPress: () -> Unit,
     onAction: (String) -> Unit,
+    onSwipe: (Boolean) -> Unit,
 ) {
     val tap by rememberUpdatedState(onTap)
+    val swipe by rememberUpdatedState(onSwipe)
     val hold by rememberUpdatedState(onLongPress)
 
     val w by animateDpAsState(ui.w.dp, mola<Dp>(), label = "largura")
@@ -96,6 +100,15 @@ fun Island(
                 .background(Color.Black)
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = { tap() }, onLongPress = { hold() })
+                }
+                // Deslizar para o lado: troca de música
+                .pointerInput(Unit) {
+                    var dx = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { dx = 0f },
+                        onDragEnd = { if (abs(dx) > 48.dp.toPx()) swipe(dx > 0) },
+                        onHorizontalDrag = { change, d -> dx += d; change.consume() },
+                    )
                 },
         ) {
             // O conteúdo é montado já no tamanho final e fica centralizado;
@@ -121,7 +134,8 @@ fun Island(
                     Modo.IDLE -> Box(Modifier.fillMaxSize())
                     Modo.MUSIC_C -> ui.music?.let { MusicaCompacta(it) }
                     Modo.MUSIC_X -> ui.music?.let { MusicaExpandida(it, ui.topo, onAction) }
-                    Modo.NOTIF -> ui.notif?.let { Notificacao(it, ui.topo) }
+                    Modo.NOTIF -> ui.notif?.let { Notificacao(it, ui.topo, false, onAction) }
+                    Modo.NOTIF_X -> ui.notif?.let { Notificacao(it, ui.topo, true, onAction) }
                 }
             }
         }
@@ -227,8 +241,18 @@ private fun MusicaExpandida(m: MusicInfo, topo: Float, onAction: (String) -> Uni
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(mmss(pos), color = Cinza, fontSize = 11.sp)
                 Spacer(Modifier.width(8.dp))
+                // Toque na barra: pula para aquele ponto da música
                 Box(
-                    Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(3.dp))
+                    Modifier.weight(1f).height(18.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures { o ->
+                                onAction("seek:" + (o.x / size.width).coerceIn(0f, 1f))
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                Box(
+                    Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp))
                         .background(Color(0xFF333333)),
                 ) {
                     Box(
@@ -236,6 +260,7 @@ private fun MusicaExpandida(m: MusicInfo, topo: Float, onAction: (String) -> Uni
                             .fillMaxWidth((pos.toFloat() / m.duration).coerceIn(0f, 1f))
                             .background(Color.White),
                     )
+                }
                 }
                 Spacer(Modifier.width(8.dp))
                 Text("-" + mmss(m.duration - pos), color = Cinza, fontSize = 11.sp)
@@ -294,35 +319,59 @@ private fun Icone(tipo: IconeTipo, tamanho: Dp) {
 // ---------- notificação ----------
 
 @Composable
-private fun Notificacao(n: NotifInfo, topo: Float) {
-    Row(
-        Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = topo.dp, bottom = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun Notificacao(n: NotifInfo, topo: Float, aberta: Boolean, onAction: (String) -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = topo.dp, bottom = 14.dp),
     ) {
-        val bmp = n.icon
-        if (bmp != null) {
-            val img = remember(bmp) { bmp.asImageBitmap() }
-            Image(
-                img, contentDescription = null, contentScale = ContentScale.Crop,
-                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)),
-            )
-        } else {
-            Box(Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)).background(Color(0xFF333333)))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                n.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            if (n.text.isNotBlank()) {
-                Text(
-                    n.text, color = Cinza, fontSize = 14.sp,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+        Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+            val bmp = n.icon
+            if (bmp != null) {
+                val img = remember(bmp) { bmp.asImageBitmap() }
+                Image(
+                    img, contentDescription = null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)),
                 )
+            } else {
+                Box(Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)).background(Color(0xFF333333)))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    n.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                if (n.text.isNotBlank()) {
+                    Text(
+                        n.text, color = Cinza, fontSize = 14.sp,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(n.app, color = Cinza, fontSize = 11.sp, maxLines = 1)
+        }
+        if (aberta && n.actions.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                n.actions.forEachIndexed { i, a ->
+                    val responder = !a.remoteInputs.isNullOrEmpty()
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(21.dp))
+                            .background(if (responder) Color(0xFF0A84FF) else Color(0xFF2C2C2E))
+                            .pointerInput(i) { detectTapGestures { onAction("acao:$i") } },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            a.title.toString(), color = Color.White, fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 10.dp),
+                        )
+                    }
+                }
             }
         }
-        Spacer(Modifier.width(8.dp))
-        Text(n.app, color = Cinza, fontSize = 11.sp, maxLines = 1)
     }
 }

@@ -40,6 +40,15 @@
                 android:resource="@xml/accessibility_config" />
         </service>
 
+        <activity
+            android:name=".ReplyActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Resposta"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+
         <receiver
             android:name=".InstallReceiver"
             android:exported="false" />

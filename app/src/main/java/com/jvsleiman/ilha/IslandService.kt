@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.ActivityOptions
 import android.app.PendingIntent
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.PixelFormat
@@ -26,7 +27,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-enum class Modo { IDLE, MUSIC_C, MUSIC_X, NOTIF }
+enum class Modo { IDLE, MUSIC_C, MUSIC_X, NOTIF, NOTIF_X }
 
 /** Tudo que a ilha precisa para se desenhar. Tamanhos em dp. */
 data class UiState(
@@ -68,6 +69,7 @@ class IslandService : AccessibilityService() {
     private var music: MusicInfo? = null
     private var musicVisible = false
     private var notif: NotifInfo? = null
+    private var notifAberta = false
     private var hideMusicJob: Job? = null
     private var notifJob: Job? = null
 
@@ -98,13 +100,16 @@ class IslandService : AccessibilityService() {
                     onTap = { tocar() },
                     onLongPress = { segurar() },
                     onAction = { acao(it) },
+                    onSwipe = { deslizar(it) },
                 )
             }
         }
         val t = View(this).apply {
             setOnTouchListener { _, e ->
                 if (e.action == MotionEvent.ACTION_OUTSIDE) {
-                    if (expanded) {
+                    if (notifAberta) {
+                        fecharNotif()
+                    } else if (expanded) {
                         expanded = false
                         refresh()
                     }
@@ -182,21 +187,41 @@ class IslandService : AccessibilityService() {
 
     private fun onNotif(n: NotifInfo) {
         notif = n
+        notifAberta = false
+        agendarFechamento(NOTIF_MS)
+        refresh()
+    }
+
+    private fun agendarFechamento(ms: Long) {
         notifJob?.cancel()
         notifJob = owner.lifecycleScope.launch {
-            delay(NOTIF_MS)
-            notif = null
-            refresh()
+            delay(ms)
+            fecharNotif()
         }
+    }
+
+    private fun fecharNotif() {
+        notifJob?.cancel()
+        notif = null
+        notifAberta = false
         refresh()
     }
 
     private fun tocar() {
         when (ui.value.modo) {
             Modo.NOTIF -> {
+                if (notif?.actions.isNullOrEmpty()) {
+                    abrir(notif?.intent)
+                    fecharNotif()
+                } else {
+                    // Expande e mostra os botões; fica aberta mais tempo
+                    notifAberta = true
+                    agendarFechamento(12_000L)
+                }
+            }
+            Modo.NOTIF_X -> {
                 abrir(notif?.intent)
-                notifJob?.cancel()
-                notif = null
+                fecharNotif()
             }
             Modo.MUSIC_C -> expanded = true
             Modo.MUSIC_X -> expanded = false
@@ -217,7 +242,17 @@ class IslandService : AccessibilityService() {
     }
 
     private fun acao(a: String) {
+        if (a.startsWith("acao:")) {
+            acaoNotif(a.removePrefix("acao:").toIntOrNull() ?: return)
+            return
+        }
         val t = music?.controller?.transportControls ?: return
+        if (a.startsWith("seek:")) {
+            val f = a.removePrefix("seek:").toFloatOrNull() ?: return
+            val d = music?.duration ?: 0L
+            if (d > 0) t.seekTo((f * d).toLong())
+            return
+        }
         when (a) {
             "play" -> if (music?.playing == true) t.pause() else t.play()
             "next" -> t.skipToNext()
@@ -228,6 +263,40 @@ class IslandService : AccessibilityService() {
                 refresh()
             }
         }
+    }
+
+    /** Botão da notificação: responder abre o campo de texto; os outros executam direto. */
+    private fun acaoNotif(i: Int) {
+        val n = notif ?: return
+        val action = n.actions.getOrNull(i) ?: return
+        IslandBus.silenciar(n.key)
+        if (!action.remoteInputs.isNullOrEmpty()) {
+            IslandBus.reply = ReplyRequest(n, action)
+            try {
+                startActivity(
+                    Intent(this, ReplyActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+                )
+            } catch (e: Exception) {
+                IslandBus.log("Não consegui abrir a resposta: ${e.message}")
+            }
+        } else {
+            try {
+                action.actionIntent.send()
+                IslandBus.log("Ação \"${action.title}\" enviada")
+            } catch (e: Exception) {
+                IslandBus.log("Ação falhou: ${e.message}")
+            }
+        }
+        fecharNotif()
+    }
+
+    /** Deslizar a ilha com música: troca de faixa. */
+    private fun deslizar(direita: Boolean) {
+        val m = ui.value.modo
+        if (m != Modo.MUSIC_C && m != Modo.MUSIC_X) return
+        val t = music?.controller?.transportControls ?: return
+        if (direita) t.skipToPrevious() else t.skipToNext()
     }
 
     /** Abre o app dono da notificação/música. */
@@ -259,11 +328,11 @@ class IslandService : AccessibilityService() {
     private fun computeUi(): UiState {
         val m = music
         val modo = when {
-            notif != null -> Modo.NOTIF
+            notif != null -> if (notifAberta) Modo.NOTIF_X else Modo.NOTIF
             musicVisible && m != null -> if (expanded) Modo.MUSIC_X else Modo.MUSIC_C
             else -> Modo.IDLE
         }
-        if (modo == Modo.IDLE || modo == Modo.NOTIF) expanded = false
+        if (modo == Modo.IDLE) expanded = false
         val largo = screenWidthDp() - 2f * cfg.margem
         // O conteúdo expandido começa abaixo da câmera
         val topo = cfg.height + cfg.respiro
@@ -272,6 +341,7 @@ class IslandService : AccessibilityService() {
             Modo.MUSIC_C -> Triple(cfg.width + cfg.musicaExtra, cfg.height, cfg.height / 2f)
             Modo.MUSIC_X -> Triple(largo, topo + 154f, 42f)
             Modo.NOTIF -> Triple(largo, topo + 66f, 36f)
+            Modo.NOTIF_X -> Triple(largo, topo + 120f, 38f)
         }
         return UiState(modo, w, h, r, m, notif, ui.value.cx, topo)
     }

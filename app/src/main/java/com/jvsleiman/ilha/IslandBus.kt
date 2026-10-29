@@ -1,5 +1,6 @@
 package com.jvsleiman.ilha
 
+import android.app.Notification
 import android.app.PendingIntent
 import android.graphics.Bitmap
 import android.media.session.MediaController
@@ -34,12 +35,30 @@ data class NotifInfo(
     val text: String,
     val icon: Bitmap?,
     val intent: PendingIntent?,
+    /** Botões que o app oferece (ex.: Responder, Marcar como lida). */
+    val actions: List<Notification.Action> = emptyList(),
 )
+
+/** Resposta em andamento: a tela de resposta lê daqui. */
+data class ReplyRequest(val notif: NotifInfo, val action: Notification.Action)
 
 /** Ponte entre o leitor de notificações e a ilha (os dois rodam no mesmo processo). */
 object IslandBus {
     val music = MutableStateFlow<MusicInfo?>(null)
     val notifs = MutableSharedFlow<NotifInfo>(extraBufferCapacity = 8)
+
+    /** Resposta que a tela de resposta deve enviar. */
+    var reply: ReplyRequest? = null
+
+    /** Notificações que acabaram de receber uma ação: não reaparecem por alguns segundos. */
+    private val silenciadas = HashMap<String, Long>()
+
+    fun silenciar(key: String, ms: Long = 5_000L) {
+        silenciadas[key] = SystemClock.elapsedRealtime() + ms
+    }
+
+    fun silenciada(key: String): Boolean =
+        (silenciadas[key] ?: 0L) > SystemClock.elapsedRealtime()
 
     // Diagnóstico (aparece na tela do app)
     val serviceOn = MutableStateFlow(false)

@@ -169,6 +169,7 @@ class NotificationWatcher : NotificationListenerService() {
         }
 
         val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return
+        if (IslandBus.silenciada(sbn.key)) return
         val text = (n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: n.extras.getCharSequence(Notification.EXTRA_TEXT) ?: "").toString()
 
@@ -190,7 +191,9 @@ class NotificationWatcher : NotificationListenerService() {
         }
 
         IslandBus.log("Notificação enviada à ilha: $app")
-        IslandBus.notifs.tryEmit(NotifInfo(sbn.key, app, title, text, icon, n.contentIntent))
+        val acoes = n.actions?.filter { it.actionIntent != null && !it.title.isNullOrBlank() }
+            ?.take(3) ?: emptyList()
+        IslandBus.notifs.tryEmit(NotifInfo(sbn.key, app, title, text, icon, n.contentIntent, acoes))
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
