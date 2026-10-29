@@ -2,6 +2,8 @@ package com.jvsleiman.ilha
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import kotlin.math.abs
 import androidx.compose.foundation.layout.offset
@@ -142,6 +144,9 @@ fun Island(
                     Modo.NOTIF_X -> ui.notif?.let { CartaoNotif(it, ui, onAction) }
                 }
             }
+
+            // Ícone do app: um elemento só que desliza entre faixa → lado da câmera → cabeçalho do cartão
+            IconeCompartilhado(ui)
         }
     }
 }
@@ -337,6 +342,30 @@ private fun IconeApp(bmp: android.graphics.Bitmap?, tamanho: Dp) {
     }
 }
 
+@Composable
+private fun IconeCompartilhado(ui: UiState) {
+    var ultimo by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val n = ui.notif
+    if (n != null) ultimo = n.appIcon ?: n.icon
+    val ativo = n != null && (ui.modo == Modo.NOTIF || ui.modo == Modo.NOTIF_C || ui.modo == Modo.NOTIF_X)
+    val cartao = ui.modo == Modo.NOTIF_X
+
+    val tam = if (cartao) 18f else 20f
+    val x by animateDpAsState((if (cartao) MARGEM_INTERNA else 6f).dp, molaIcone(), label = "iconeX")
+    val y by animateDpAsState(
+        (if (cartao) ui.acima + (ui.alturaCamera - tam) / 2f else (ui.alturaCamera - tam) / 2f).dp,
+        molaIcone(), label = "iconeY",
+    )
+    val t by animateDpAsState(tam.dp, molaIcone(), label = "iconeTam")
+    val alfa by animateFloatAsState(if (ativo) 1f else 0f, tween(if (ativo) 200 else 120), label = "iconeAlfa")
+
+    if (alfa > 0.01f) {
+        Box(Modifier.offset(x, y).graphicsLayer { alpha = alfa }) { IconeApp(ultimo, t) }
+    }
+}
+
+private fun <T> molaIcone() = spring<T>(dampingRatio = 0.85f, stiffness = 300f)
+
 /** Faixa larga: ícone e nome do app à esquerda, "1 nova mensagem" na cor do app à direita. */
 @Composable
 private fun FaixaNotif(n: NotifInfo, contagem: Int) {
@@ -344,8 +373,7 @@ private fun FaixaNotif(n: NotifInfo, contagem: Int) {
         Modifier.fillMaxSize().padding(start = 6.dp, end = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconeApp(n.appIcon ?: n.icon, 20.dp)
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(20.dp + 8.dp)) // lugar do ícone compartilhado
         Text(
             n.app, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -362,12 +390,8 @@ private fun FaixaNotif(n: NotifInfo, contagem: Int) {
 /** Compacto: só o ícone do app ao lado da câmera, avisando que tem mensagem. */
 @Composable
 private fun IconeNotif(n: NotifInfo) {
-    Row(
-        Modifier.fillMaxSize().padding(horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconeApp(n.appIcon ?: n.icon, 20.dp)
-    }
+    // O ícone é desenhado pelo IconeCompartilhado
+    Box(Modifier.fillMaxSize())
 }
 
 /** Cartão aberto: cabeçalho do app, pessoa, horário, mensagem e botões contornados. */
@@ -386,8 +410,7 @@ private fun CartaoNotif(n: NotifInfo, ui: UiState, onAction: (String) -> Unit) {
                 .height(ui.alturaCamera.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconeApp(n.appIcon, 18.dp)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(18.dp + 8.dp)) // lugar do ícone compartilhado
             Text(n.app, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
         }
 
