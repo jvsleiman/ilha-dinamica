@@ -41,6 +41,10 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -196,17 +200,35 @@ fun Tela(retorno: Int) {
             }
 
             item {
+                Favoritos(cfg) { salvar(it.copy(enabled = cfg.enabled)) }
+            }
+
+            item {
                 Secao("Ajustes da ilha") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Mostrar ilha", Modifier.weight(1f))
                         Switch(checked = cfg.enabled, onCheckedChange = { salvar(cfg.copy(enabled = it)) })
                     }
+                    Subtitulo("Ilha parada")
                     Ajuste("Largura", cfg.width, 60f..180f, "dp") { salvar(cfg.copy(width = it)) }
                     Ajuste("Altura", cfg.height, 20f..48f, "dp") { salvar(cfg.copy(height = it)) }
-                    Ajuste("Posição horizontal", cfg.offsetX, -40f..40f, "dp") { salvar(cfg.copy(offsetX = it)) }
-                    Ajuste("Posição vertical", cfg.offsetY, -30f..30f, "dp") { salvar(cfg.copy(offsetY = it)) }
-                    TextButton(onClick = { salvar(Config(enabled = cfg.enabled)) }) {
-                        Text("Restaurar padrão")
+                    Subtitulo("Posição")
+                    Ajuste("Horizontal", cfg.offsetX, -60f..60f, "dp") { salvar(cfg.copy(offsetX = it)) }
+                    Ajuste("Vertical", cfg.offsetY, -40f..40f, "dp") { salvar(cfg.copy(offsetY = it)) }
+                    Subtitulo("Com música")
+                    Ajuste("Quanto estica", cfg.musicaExtra, 60f..220f, "dp") { salvar(cfg.copy(musicaExtra = it)) }
+                    Subtitulo("Expandida (notificações e música)")
+                    Ajuste("Espaço abaixo da câmera", cfg.respiro, 0f..40f, "dp") { salvar(cfg.copy(respiro = it)) }
+                    Ajuste("Margem das laterais", cfg.margem, 4f..48f, "dp") { salvar(cfg.copy(margem = it)) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            IslandBus.notifs.tryEmit(
+                                NotifInfo("teste", "Ilha", "Pré-visualização", "Assim fica uma notificação na ilha", null, null),
+                            )
+                        }) { Text("Ver expandida") }
+                        TextButton(onClick = { salvar(Config(enabled = cfg.enabled)) }) {
+                            Text("Restaurar padrão")
+                        }
                     }
                 }
             }
@@ -395,6 +417,88 @@ fun Atualizacao() {
                 }) { Text("Atualizar agora") }
             }
             OutlinedButton(onClick = { verificar() }, enabled = p == null) { Text("Procurar de novo") }
+        }
+    }
+}
+
+@Composable
+fun Subtitulo(t: String) {
+    Text(
+        t, fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+@Composable
+fun Favoritos(atual: Config, aplicar: (Config) -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = remember { Prefs.get(ctx) }
+    var meus by remember { mutableStateOf(Prefs.favoritos(prefs)) }
+    var nome by remember { mutableStateOf("") }
+    var salvando by remember { mutableStateOf(false) }
+    var removendo by remember { mutableStateOf(false) }
+
+    Secao("Favoritos") {
+        Text(
+            if (removendo) "Toque num favorito seu para apagar."
+            else "Toque para aplicar. Salve o ajuste atual para usar depois.",
+            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PRONTOS.forEach { f ->
+                FilterChip(
+                    selected = f.config.mesmasMedidas(atual),
+                    onClick = { if (!removendo) aplicar(f.config) },
+                    label = { Text(f.nome) },
+                    enabled = !removendo,
+                )
+            }
+            meus.forEachIndexed { i, f ->
+                FilterChip(
+                    selected = !removendo && f.config.mesmasMedidas(atual),
+                    onClick = {
+                        if (removendo) {
+                            meus = meus.filterIndexed { j, _ -> j != i }
+                            Prefs.salvarFavoritos(prefs, meus)
+                            if (meus.isEmpty()) removendo = false
+                        } else aplicar(f.config)
+                    },
+                    label = { Text(if (removendo) "✕  ${f.nome}" else f.nome) },
+                )
+            }
+        }
+        if (salvando) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = nome,
+                    onValueChange = { nome = it.take(20) },
+                    label = { Text("Nome do favorito") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = {
+                        meus = meus + Favorito(nome.trim(), atual.copy(enabled = true))
+                        Prefs.salvarFavoritos(prefs, meus)
+                        nome = ""
+                        salvando = false
+                    },
+                    enabled = nome.isNotBlank(),
+                ) { Text("Salvar") }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { salvando = true; removendo = false }) { Text("Salvar atual") }
+                if (meus.isNotEmpty()) {
+                    TextButton(onClick = { removendo = !removendo }) {
+                        Text(if (removendo) "Concluir" else "Apagar")
+                    }
+                }
+            }
         }
     }
 }

@@ -42,11 +42,9 @@ data class UiState(
     val topo: Float = 38f,
 )
 
-/** Espaço entre a faixa da câmera e o conteúdo expandido, em dp. */
-const val RESPIRO = 10f
 
 /** Altura da maior forma da ilha (música expandida), em dp. */
-const val MAX_H = 240f
+const val MAX_H = 260f
 
 /** Quanto tempo a música pausada continua na ilha. */
 private const val PAUSA_VISIVEL_MS = 30_000L
@@ -266,12 +264,12 @@ class IslandService : AccessibilityService() {
             else -> Modo.IDLE
         }
         if (modo == Modo.IDLE || modo == Modo.NOTIF) expanded = false
-        val largo = screenWidthDp() - 24f
+        val largo = screenWidthDp() - 2f * cfg.margem
         // O conteúdo expandido começa abaixo da câmera
-        val topo = cfg.height + RESPIRO
+        val topo = cfg.height + cfg.respiro
         val (w, h, r) = when (modo) {
             Modo.IDLE -> Triple(cfg.width, cfg.height, cfg.height / 2f)
-            Modo.MUSIC_C -> Triple(cfg.width + 120f, cfg.height, cfg.height / 2f)
+            Modo.MUSIC_C -> Triple(cfg.width + cfg.musicaExtra, cfg.height, cfg.height / 2f)
             Modo.MUSIC_X -> Triple(largo, topo + 154f, 42f)
             Modo.NOTIF -> Triple(largo, topo + 66f, 36f)
         }
