@@ -127,7 +127,7 @@ fun Tela(retorno: Int) {
                 Column {
                     Text("Ilha Dinâmica", fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Etapa 1 · ilha parada sobre a câmera",
+                        "Etapa 2 · música e notificações",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -144,7 +144,7 @@ fun Tela(retorno: Int) {
                     HorizontalDivider()
                     Permissao(
                         titulo = "Acesso às notificações",
-                        desc = "Para música, chamadas e timer (a partir da etapa 2).",
+                        desc = "Obrigatório para música e notificações na ilha.",
                         ok = notif,
                         acao = "Ativar",
                     ) { ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
@@ -203,8 +203,8 @@ fun Tela(retorno: Int) {
 
             item {
                 Text(
-                    "Mexa nos ajustes e veja a ilha mudar na hora. Toque nela para testar a " +
-                        "animação de expandir; toque fora para recolher.",
+                    "Toque nela com uma música tocando para expandir; segure para abrir o app. " +
+                        "Toque fora para recolher. Mexa nos ajustes e a ilha muda na hora.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(bottom = 24.dp),
