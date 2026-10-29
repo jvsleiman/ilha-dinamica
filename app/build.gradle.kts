@@ -16,8 +16,25 @@ android {
         versionName = "0.1"
     }
 
+    // Chave fixa: todas as versões saem com a mesma assinatura, então uma atualiza a outra.
+    // O arquivo .p12 é protegido por senha; a senha fica só no segredo KEYSTORE_PASSWORD do GitHub.
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("keystore/ilha.p12")
+            storeType = "pkcs12"
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = "ilha"
+            keyPassword = System.getenv("KEYSTORE_PASSWORD")
+        }
+    }
+
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

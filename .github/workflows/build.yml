@@ -23,11 +23,22 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Compilar
-        run: gradle assembleDebug --no-daemon
+      - name: Conferir senha da chave
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Falta o segredo KEYSTORE_PASSWORD em Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+
+      - name: Compilar versão assinada
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: gradle assembleRelease --no-daemon
 
       - name: Renomear APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk IlhaDinamica.apk
+        run: cp app/build/outputs/apk/release/app-release.apk IlhaDinamica.apk
 
       - uses: actions/upload-artifact@v4
         with:
