@@ -37,6 +37,12 @@ data class NotifInfo(
     val intent: PendingIntent?,
     /** Botões que o app oferece (ex.: Responder, Marcar como lida). */
     val actions: List<Notification.Action> = emptyList(),
+    val pkg: String = "",
+    /** Ícone do app (para o cabeçalho e o estado compacto). */
+    val appIcon: Bitmap? = null,
+    /** Cor do app (verde no WhatsApp). */
+    val accent: Int = 0xFF0A84FF.toInt(),
+    val time: Long = 0L,
 )
 
 /** Resposta em andamento: a tela de resposta lê daqui. */
@@ -46,6 +52,7 @@ data class ReplyRequest(val notif: NotifInfo, val action: Notification.Action)
 object IslandBus {
     val music = MutableStateFlow<MusicInfo?>(null)
     val notifs = MutableSharedFlow<NotifInfo>(extraBufferCapacity = 8)
+    val removidas = MutableSharedFlow<String>(extraBufferCapacity = 16)
 
     /** Resposta que a tela de resposta deve enviar. */
     var reply: ReplyRequest? = null

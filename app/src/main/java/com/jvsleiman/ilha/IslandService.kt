@@ -27,7 +27,13 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-enum class Modo { IDLE, MUSIC_C, MUSIC_X, NOTIF, NOTIF_X }
+/**
+ * NOTIF = faixa larga "1 nova mensagem"; NOTIF_X = cartão aberto com botões;
+ * NOTIF_C = só o ícone do app ao lado da câmera (mensagem pendente).
+ */
+enum class Modo { IDLE, MUSIC_C, MUSIC_X, NOTIF, NOTIF_X, NOTIF_C }
+
+private enum class Fase { FAIXA, ABERTA, PENDENTE }
 
 /** Tudo que a ilha precisa para se desenhar. Tamanhos em dp. */
 data class UiState(
@@ -43,11 +49,15 @@ data class UiState(
     val topo: Float = 38f,
     /** Topo da forma, em pixels da tela (sobe quando expande). */
     val y: Float = 0f,
+    /** Quantas mensagens novas do mesmo app. */
+    val contagem: Int = 0,
+    val acima: Float = 8f,
+    val alturaCamera: Float = 30f,
 )
 
 /** Margem interna padrão das formas expandidas: laterais e base iguais, em dp. */
 const val MARGEM_INTERNA = 20f
-fun Modo.expandido() = this == Modo.MUSIC_X || this == Modo.NOTIF || this == Modo.NOTIF_X
+fun Modo.expandido() = this == Modo.MUSIC_X || this == Modo.NOTIF_X
 
 
 /** Altura da maior forma da ilha (música expandida), em dp. */
@@ -55,7 +65,9 @@ const val MAX_H = 300f
 
 /** Quanto tempo a música pausada continua na ilha. */
 private const val PAUSA_VISIVEL_MS = 30_000L
-/** Quanto tempo uma notificação fica aberta. */
+/** Quanto tempo o ícone de mensagem pendente fica ao lado da câmera. */
+private const val PENDENTE_MS = 60_000L
+/** Quanto tempo a faixa "nova mensagem" fica aberta. */
 private const val NOTIF_MS = 4_500L
 
 class IslandService : AccessibilityService() {
@@ -75,7 +87,9 @@ class IslandService : AccessibilityService() {
     private var music: MusicInfo? = null
     private var musicVisible = false
     private var notif: NotifInfo? = null
-    private var notifAberta = false
+    private var fase = Fase.FAIXA
+    /** Quantas mensagens chegaram do mesmo app desde a última vez que você viu. */
+    private var contagem = 0
     private var hideMusicJob: Job? = null
     private var notifJob: Job? = null
 
@@ -113,8 +127,8 @@ class IslandService : AccessibilityService() {
         val t = View(this).apply {
             setOnTouchListener { _, e ->
                 if (e.action == MotionEvent.ACTION_OUTSIDE) {
-                    if (notifAberta) {
-                        fecharNotif()
+                    if (notif != null && fase == Fase.ABERTA) {
+                        pendente()
                     } else if (expanded) {
                         expanded = false
                         refresh()
@@ -164,6 +178,10 @@ class IslandService : AccessibilityService() {
         owner.lifecycleScope.launch {
             IslandBus.notifs.collect { n -> onNotif(n) }
         }
+        owner.lifecycleScope.launch {
+            // Lida em outro lugar (ou apagada): tira da ilha
+            IslandBus.removidas.collect { key -> if (notif?.key == key && fase != Fase.ABERTA) fecharNotif() }
+        }
     }
 
     // ---------- eventos ----------
@@ -192,38 +210,43 @@ class IslandService : AccessibilityService() {
     }
 
     private fun onNotif(n: NotifInfo) {
+        contagem = if (notif?.pkg == n.pkg) contagem + 1 else 1
         notif = n
-        notifAberta = false
-        agendarFechamento(NOTIF_MS)
+        fase = Fase.FAIXA
+        depois(NOTIF_MS) { pendente() }
         refresh()
     }
 
-    private fun agendarFechamento(ms: Long) {
+    private fun depois(ms: Long, bloco: () -> Unit) {
         notifJob?.cancel()
         notifJob = owner.lifecycleScope.launch {
             delay(ms)
-            fecharNotif()
+            bloco()
         }
+    }
+
+    /** Encolhe para o ícone do app ao lado da câmera; some sozinho depois de um tempo. */
+    private fun pendente() {
+        if (notif == null) return
+        fase = Fase.PENDENTE
+        depois(PENDENTE_MS) { fecharNotif() }
+        refresh()
     }
 
     private fun fecharNotif() {
         notifJob?.cancel()
         notif = null
-        notifAberta = false
+        fase = Fase.FAIXA
+        contagem = 0
         refresh()
     }
 
     private fun tocar() {
         when (ui.value.modo) {
-            Modo.NOTIF -> {
-                if (notif?.actions.isNullOrEmpty()) {
-                    abrir(notif?.intent)
-                    fecharNotif()
-                } else {
-                    // Expande e mostra os botões; fica aberta mais tempo
-                    notifAberta = true
-                    agendarFechamento(12_000L)
-                }
+            Modo.NOTIF, Modo.NOTIF_C -> {
+                // Abre o cartão; fica aberto mais tempo antes de voltar ao ícone
+                fase = Fase.ABERTA
+                depois(12_000L) { pendente() }
             }
             Modo.NOTIF_X -> {
                 abrir(notif?.intent)
@@ -334,8 +357,10 @@ class IslandService : AccessibilityService() {
     private fun computeUi(): UiState {
         val m = music
         val modo = when {
-            notif != null -> if (notifAberta) Modo.NOTIF_X else Modo.NOTIF
+            notif != null && fase == Fase.FAIXA -> Modo.NOTIF
+            notif != null && fase == Fase.ABERTA -> Modo.NOTIF_X
             musicVisible && m != null -> if (expanded) Modo.MUSIC_X else Modo.MUSIC_C
+            notif != null -> Modo.NOTIF_C
             else -> Modo.IDLE
         }
         if (modo == Modo.IDLE) expanded = false
@@ -348,10 +373,16 @@ class IslandService : AccessibilityService() {
             Modo.IDLE -> Triple(cfg.width, cfg.height, cfg.height / 2f)
             Modo.MUSIC_C -> Triple(cfg.width + cfg.musicaExtra, cfg.height, cfg.height / 2f)
             Modo.MUSIC_X -> Triple(largo, topo + 142f + base, 44f)
-            Modo.NOTIF -> Triple(largo, topo + 52f + base, 40f)
-            Modo.NOTIF_X -> Triple(largo, topo + 52f + 16f + 44f + base, 44f)
+            Modo.NOTIF -> Triple(largo, cfg.height, cfg.height / 2f)
+            Modo.NOTIF_C -> Triple(cfg.width + 44f, cfg.height, cfg.height / 2f)
+            // cabeçalho do app (na altura da câmera) + pessoa e mensagem + botões
+            Modo.NOTIF_X -> Triple(
+                largo,
+                topo + 52f + (if (notif?.actions.isNullOrEmpty()) 0f else 16f + 36f) + base,
+                44f,
+            )
         }
-        return UiState(modo, w, h, r, m, notif, ui.value.cx, topo, ui.value.y)
+        return UiState(modo, w, h, r, m, notif, ui.value.cx, topo, ui.value.y, contagem, cfg.acima, cfg.height)
     }
 
     private fun refresh() {

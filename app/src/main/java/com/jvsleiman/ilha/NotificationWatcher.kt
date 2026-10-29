@@ -184,19 +184,43 @@ class NotificationWatcher : NotificationListenerService() {
         } catch (e: Exception) {
             pkg
         }
-        val icon = try {
-            (n.getLargeIcon()?.loadDrawable(this) ?: pm.getApplicationIcon(pkg)).toBitmap(96, 96)
+        val appIcon = try {
+            pm.getApplicationIcon(pkg).toBitmap(64, 64)
         } catch (e: Exception) {
             null
+        }
+        // Foto da pessoa (se o app mandar); senão, o ícone do app
+        val icon = try {
+            n.getLargeIcon()?.loadDrawable(this)?.toBitmap(112, 112) ?: appIcon
+        } catch (e: Exception) {
+            appIcon
         }
 
         IslandBus.log("Notificação enviada à ilha: $app")
         val acoes = n.actions?.filter { it.actionIntent != null && !it.title.isNullOrBlank() }
             ?.take(3) ?: emptyList()
-        IslandBus.notifs.tryEmit(NotifInfo(sbn.key, app, title, text, icon, n.contentIntent, acoes))
+        IslandBus.notifs.tryEmit(
+            NotifInfo(
+                sbn.key, app, title, text, icon, n.contentIntent, acoes,
+                pkg = pkg, appIcon = appIcon, accent = corDoApp(pkg, n.color), time = sbn.postTime,
+            ),
+        )
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        sbn?.let { lastText.remove(it.key) }
+        sbn ?: return
+        lastText.remove(sbn.key)
+        IslandBus.removidas.tryEmit(sbn.key)
+    }
+
+    /** Cor de destaque do app: a do WhatsApp é fixa; nos outros, a cor da notificação clareada. */
+    private fun corDoApp(pkg: String, cor: Int): Int {
+        if (pkg == "com.whatsapp" || pkg == "com.whatsapp.w4b") return 0xFF25D366.toInt()
+        if (cor == 0 || Color.alpha(cor) == 0) return 0xFF0A84FF.toInt()
+        val hsv = FloatArray(3)
+        Color.colorToHSV(cor, hsv)
+        hsv[1] = hsv[1].coerceAtLeast(0.45f)
+        hsv[2] = hsv[2].coerceAtLeast(0.85f)
+        return Color.HSVToColor(hsv)
     }
 }

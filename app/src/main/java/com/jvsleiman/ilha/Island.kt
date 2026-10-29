@@ -29,6 +29,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -136,8 +137,9 @@ fun Island(
                     Modo.IDLE -> Box(Modifier.fillMaxSize())
                     Modo.MUSIC_C -> ui.music?.let { MusicaCompacta(it) }
                     Modo.MUSIC_X -> ui.music?.let { MusicaExpandida(it, ui.topo, onAction) }
-                    Modo.NOTIF -> ui.notif?.let { Notificacao(it, ui.topo, false, onAction) }
-                    Modo.NOTIF_X -> ui.notif?.let { Notificacao(it, ui.topo, true, onAction) }
+                    Modo.NOTIF -> ui.notif?.let { FaixaNotif(it, ui.contagem) }
+                    Modo.NOTIF_C -> ui.notif?.let { IconeNotif(it) }
+                    Modo.NOTIF_X -> ui.notif?.let { CartaoNotif(it, ui, onAction) }
                 }
             }
         }
@@ -323,58 +325,122 @@ private fun Icone(tipo: IconeTipo, tamanho: Dp) {
 // ---------- notificação ----------
 
 @Composable
-private fun Notificacao(n: NotifInfo, topo: Float, aberta: Boolean, onAction: (String) -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(
-            start = MARGEM_INTERNA.dp, end = MARGEM_INTERNA.dp, top = topo.dp, bottom = MARGEM_INTERNA.dp,
-        ),
+private fun IconeApp(bmp: android.graphics.Bitmap?, tamanho: Dp) {
+    if (bmp != null) {
+        val img = remember(bmp) { bmp.asImageBitmap() }
+        Image(
+            img, contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.size(tamanho).clip(RoundedCornerShape(tamanho / 2)),
+        )
+    } else {
+        Box(Modifier.size(tamanho).clip(RoundedCornerShape(tamanho / 2)).background(Color(0xFF333333)))
+    }
+}
+
+/** Faixa larga: ícone e nome do app à esquerda, "1 nova mensagem" na cor do app à direita. */
+@Composable
+private fun FaixaNotif(n: NotifInfo, contagem: Int) {
+    Row(
+        Modifier.fillMaxSize().padding(start = 6.dp, end = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
-            val bmp = n.icon
-            if (bmp != null) {
-                val img = remember(bmp) { bmp.asImageBitmap() }
-                Image(
-                    img, contentDescription = null, contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)),
-                )
-            } else {
-                Box(Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)).background(Color(0xFF333333)))
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    n.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                if (n.text.isNotBlank()) {
-                    Text(
-                        n.text, color = Cinza, fontSize = 14.sp,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+        IconeApp(n.appIcon ?: n.icon, 20.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            n.app, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.weight(1f))
+        val qtd = contagem.coerceAtLeast(1)
+        Text(
+            if (qtd == 1) "1 nova mensagem" else "$qtd novas mensagens",
+            color = Color(n.accent), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+        )
+    }
+}
+
+/** Compacto: só o ícone do app ao lado da câmera, avisando que tem mensagem. */
+@Composable
+private fun IconeNotif(n: NotifInfo) {
+    Row(
+        Modifier.fillMaxSize().padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconeApp(n.appIcon ?: n.icon, 20.dp)
+    }
+}
+
+/** Cartão aberto: cabeçalho do app, pessoa, horário, mensagem e botões contornados. */
+@Composable
+private fun CartaoNotif(n: NotifInfo, ui: UiState, onAction: (String) -> Unit) {
+    val hora = remember(n.time) {
+        java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+            .format(java.util.Date(if (n.time > 0) n.time else System.currentTimeMillis()))
+    }
+    val accent = Color(n.accent)
+    Box(Modifier.fillMaxSize()) {
+        // Cabeçalho na mesma altura da câmera, encostado à esquerda
+        Row(
+            Modifier
+                .padding(start = MARGEM_INTERNA.dp, top = ui.acima.dp)
+                .height(ui.alturaCamera.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconeApp(n.appIcon, 18.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(n.app, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        }
+
+        Column(
+            Modifier.fillMaxSize().padding(
+                start = MARGEM_INTERNA.dp, end = MARGEM_INTERNA.dp, top = ui.topo.dp, bottom = MARGEM_INTERNA.dp,
+            ),
+        ) {
+            Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    IconeApp(n.icon, 46.dp)
+                    // bolinha na cor do app, como "online"
+                    Box(
+                        Modifier.align(Alignment.BottomEnd).size(12.dp).clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black).padding(2.dp).clip(RoundedCornerShape(4.dp)).background(accent),
                     )
                 }
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(n.app, color = Cinza, fontSize = 11.sp, maxLines = 1)
-        }
-        if (aberta && n.actions.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                n.actions.forEachIndexed { i, a ->
-                    val responder = !a.remoteInputs.isNullOrEmpty()
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(if (responder) Color(0xFF0A84FF) else Color(0xFF2C2C2E))
-                            .pointerInput(i) { detectTapGestures { onAction("acao:$i") } },
-                        contentAlignment = Alignment.Center,
-                    ) {
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            a.title.toString(), color = Color.White, fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 10.dp),
+                            n.title, color = Color.White, fontSize = 17.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                         )
+                        Spacer(Modifier.width(8.dp))
+                        Text(hora, color = Cinza, fontSize = 12.sp)
+                    }
+                    if (n.text.isNotBlank()) {
+                        Text(
+                            n.text, color = Color(0xFFD1D1D6), fontSize = 13.sp,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (n.actions.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    n.actions.forEachIndexed { i, a ->
+                        Box(
+                            Modifier
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .border(1.dp, accent, RoundedCornerShape(18.dp))
+                                .pointerInput(i) { detectTapGestures { onAction("acao:$i") } }
+                                .padding(horizontal = 18.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                a.title.toString(), color = accent, fontSize = 14.sp,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }

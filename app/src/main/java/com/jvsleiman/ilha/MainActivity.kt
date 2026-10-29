@@ -224,7 +224,7 @@ fun Tela(retorno: Int) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = {
                             IslandBus.notifs.tryEmit(
-                                NotifInfo("teste", "Ilha", "Pré-visualização", "Assim fica uma notificação na ilha", null, null),
+                                NotifInfo("teste", "Ilha", "Pré-visualização", "Assim fica uma notificação na ilha", null, null, pkg = "teste"),
                             )
                         }) { Text("Ver expandida") }
                         TextButton(onClick = { salvar(Config(enabled = cfg.enabled)) }) {
@@ -339,7 +339,7 @@ fun Diagnostico() {
             }) { Text("Simular música") }
             OutlinedButton(onClick = {
                 IslandBus.notifs.tryEmit(
-                    NotifInfo("teste", "Ilha", "Notificação de teste", "Se você lê isto, a ilha funciona", null, null),
+                    NotifInfo("teste", "Ilha", "Notificação de teste", "Se você lê isto, a ilha funciona", null, null, pkg = "teste"),
                 )
             }) { Text("Simular aviso") }
         }
