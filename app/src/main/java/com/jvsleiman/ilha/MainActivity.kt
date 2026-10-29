@@ -42,6 +42,10 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.LinearProgressIndicator
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -163,6 +167,8 @@ fun Tela(retorno: Int) {
                     }
                 }
             }
+
+            item { Atualizacao() }
 
             item { Diagnostico() }
 
@@ -326,5 +332,69 @@ fun Linha(nome: String, valor: String, ok: Boolean) {
         )
         Text(nome, Modifier.weight(1f).padding(start = 10.dp), fontSize = 14.sp)
         Text(valor, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+@Composable
+fun Atualizacao() {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val atual = remember { Updater.installedBuild(ctx) }
+    var rel by remember { mutableStateOf<Updater.Release?>(null) }
+    var status by remember { mutableStateOf("Procurando atualização…") }
+    var baixando by remember { mutableStateOf<Float?>(null) }
+
+    fun verificar() {
+        scope.launch {
+            status = "Procurando atualização…"
+            try {
+                val r = Updater.latest()
+                rel = r
+                status = if (r.build > atual) "Nova versão disponível (compilação ${r.build})"
+                else "Você está na versão mais recente (compilação $atual)"
+            } catch (e: Exception) {
+                rel = null
+                status = e.message ?: "Erro ao procurar atualização"
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { verificar() }
+
+    Secao("Atualização") {
+        Text(status, fontSize = 14.sp)
+        val p = baixando
+        if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val r = rel
+            if (r != null && r.build > atual && p == null) {
+                Button(onClick = {
+                    if (!ctx.packageManager.canRequestPackageInstalls()) {
+                        status = "Permita \"Instalar apps desconhecidos\" para a Ilha e toque de novo"
+                        ctx.startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:${ctx.packageName}"),
+                            ),
+                        )
+                    } else {
+                        scope.launch {
+                            try {
+                                baixando = 0f
+                                status = "Baixando…"
+                                val f = Updater.download(ctx, r.apkUrl) { baixando = it }
+                                status = "Instalando… o app vai fechar e reabrir atualizado"
+                                Updater.install(ctx, f)
+                            } catch (e: Exception) {
+                                status = e.message ?: "Erro ao atualizar"
+                            } finally {
+                                baixando = null
+                            }
+                        }
+                    }
+                }) { Text("Atualizar agora") }
+            }
+            OutlinedButton(onClick = { verificar() }, enabled = p == null) { Text("Procurar de novo") }
+        }
     }
 }

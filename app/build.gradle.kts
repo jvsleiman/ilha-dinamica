@@ -12,8 +12,10 @@ android {
         applicationId = "com.jvsleiman.ilha"
         minSdk = 30
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.1"
+        // Número da compilação do GitHub Actions: cada APK novo tem um número maior
+        val build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionCode = build
+        versionName = "0.2.$build"
     }
 
     // Chave fixa: todas as versões saem com a mesma assinatura, então uma atualiza a outra.
