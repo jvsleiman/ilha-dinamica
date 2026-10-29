@@ -2,6 +2,12 @@ package com.jvsleiman.ilha
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
@@ -55,8 +61,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-/** Mesma mola do protótipo (amortecimento 0.72, rigidez 380). */
-private fun <T> mola() = spring<T>(dampingRatio = 0.72f, stiffness = 380f)
+/** Mola da forma: macia, com um quique bem leve no final. */
+private fun <T> mola() = spring<T>(dampingRatio = 0.82f, stiffness = 260f)
+
+/** Mola do conteúdo: sem quique. */
+private fun <T> molaConteudo() = spring<T>(dampingRatio = 1f, stiffness = 320f)
 
 private val Cinza = Color(0xFF9A9AA2)
 
@@ -89,12 +98,22 @@ fun Island(
                     detectTapGestures(onTap = { tap() }, onLongPress = { hold() })
                 },
         ) {
+            // O conteúdo é montado já no tamanho final e fica centralizado;
+            // a ilha só "revela" ele enquanto cresce, sem reorganizar o texto a cada quadro.
             AnimatedContent(
                 targetState = ui.modo,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .wrapContentSize(Alignment.TopCenter, unbounded = true)
+                    .requiredSize(ui.w.dp, ui.h.dp),
+                contentAlignment = Alignment.TopCenter,
                 transitionSpec = {
-                    (fadeIn(tween(240, delayMillis = 110)) + scaleIn(tween(320, delayMillis = 80), initialScale = 0.92f))
-                        .togetherWith(fadeOut(tween(90)))
+                    (fadeIn(tween(220, delayMillis = 90)) +
+                        scaleIn(molaConteudo(), initialScale = 0.88f, transformOrigin = TransformOrigin(0.5f, 0f)))
+                        .togetherWith(
+                            fadeOut(tween(110)) +
+                                scaleOut(tween(160), targetScale = 0.92f, transformOrigin = TransformOrigin(0.5f, 0f)),
+                        )
+                        .using(SizeTransform(clip = false) { _, _ -> snap() })
                 },
                 label = "conteudo",
             ) { modo ->
