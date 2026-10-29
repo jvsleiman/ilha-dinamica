@@ -41,6 +41,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.os.SystemClock
 import kotlin.math.roundToInt
 
 fun acessibilidadeAtiva(ctx: Context): Boolean {
@@ -162,6 +164,8 @@ fun Tela(retorno: Int) {
                 }
             }
 
+            item { Diagnostico() }
+
             if (!acess || !notif) {
                 item {
                     Card(
@@ -268,5 +272,59 @@ fun Ajuste(
             onValueChange = { mudar(it.roundToInt().toFloat()) },
             valueRange = faixa,
         )
+    }
+}
+
+@Composable
+fun Diagnostico() {
+    val servico by IslandBus.serviceOn.collectAsState()
+    val leitor by IslandBus.listenerOn.collectAsState()
+    val musica by IslandBus.music.collectAsState()
+    val evento by IslandBus.lastEvent.collectAsState()
+
+    Secao("Diagnóstico") {
+        Linha("Ilha desenhando", if (servico) "Sim" else "Não", servico)
+        Linha("Leitor de notificações", if (leitor) "Conectado" else "Desconectado", leitor)
+        val m = musica
+        Linha(
+            "Música detectada",
+            if (m == null) "Nenhuma" else "${m.title} · ${if (m.playing) "tocando" else "pausada"}",
+            m != null,
+        )
+        Text(
+            "Último evento: $evento", fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                if (IslandBus.music.value?.controller == null && IslandBus.music.value != null) {
+                    IslandBus.music.value = null
+                } else {
+                    IslandBus.music.value = MusicInfo(
+                        title = "Música de teste", artist = "Ilha Dinâmica", art = null,
+                        accent = 0xFFFF9F7A.toInt(), playing = true, position = 0L,
+                        positionTime = SystemClock.elapsedRealtime(), speed = 1f,
+                        duration = 180_000L, controller = null,
+                    )
+                }
+            }) { Text("Simular música") }
+            OutlinedButton(onClick = {
+                IslandBus.notifs.tryEmit(
+                    NotifInfo("teste", "Ilha", "Notificação de teste", "Se você lê isto, a ilha funciona", null, null),
+                )
+            }) { Text("Simular aviso") }
+        }
+    }
+}
+
+@Composable
+fun Linha(nome: String, valor: String, ok: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(8.dp).clip(CircleShape)
+                .background(if (ok) Color(0xFF34C759) else MaterialTheme.colorScheme.outline),
+        )
+        Text(nome, Modifier.weight(1f).padding(start = 10.dp), fontSize = 14.sp)
+        Text(valor, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }

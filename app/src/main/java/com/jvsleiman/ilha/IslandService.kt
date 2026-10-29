@@ -117,6 +117,8 @@ class IslandService : AccessibilityService() {
         ui.value = computeUi()
         computeWindow(grow = false)
         manager.addView(v, params)
+        IslandBus.serviceOn.value = true
+        IslandBus.log("Ilha conectada")
 
         owner.lifecycleScope.launch {
             IslandBus.music.collect { m -> onMusic(m) }
@@ -309,6 +311,7 @@ class IslandService : AccessibilityService() {
         if (::prefs.isInitialized) prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         view?.let { v -> if (v.isAttachedToWindow) wm?.removeView(v) }
         view = null
+        IslandBus.serviceOn.value = false
         owner.stop()
         super.onDestroy()
     }

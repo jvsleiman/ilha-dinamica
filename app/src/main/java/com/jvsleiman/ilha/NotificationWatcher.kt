@@ -48,10 +48,14 @@ class NotificationWatcher : NotificationListenerService() {
         super.onListenerConnected()
         val m = getSystemService(MediaSessionManager::class.java)
         msm = m
+        IslandBus.listenerOn.value = true
         try {
             m.addOnActiveSessionsChangedListener(sessionsListener, cn, main)
-            pick(m.getActiveSessions(cn))
+            val list = m.getActiveSessions(cn)
+            IslandBus.log("Leitor conectado · ${list.size} sessão(ões) de mídia")
+            pick(list)
         } catch (e: SecurityException) {
+            IslandBus.log("Sem permissão para ler músicas: ${e.message}")
             IslandBus.music.value = null
         }
     }
@@ -61,6 +65,8 @@ class NotificationWatcher : NotificationListenerService() {
         current?.unregisterCallback(callback)
         current = null
         IslandBus.music.value = null
+        IslandBus.listenerOn.value = false
+        IslandBus.log("Leitor de notificações desconectado")
         super.onListenerDisconnected()
     }
 
@@ -81,6 +87,7 @@ class NotificationWatcher : NotificationListenerService() {
             current?.unregisterCallback(callback)
             current = best
             best?.registerCallback(callback, main)
+            IslandBus.log("Música: acompanhando ${best?.packageName ?: "nenhum app"}")
         }
         publish()
     }
@@ -89,12 +96,14 @@ class NotificationWatcher : NotificationListenerService() {
         val c = current
         val md = c?.metadata
         if (c == null || md == null) {
+            if (c != null) IslandBus.log("Música: ${c.packageName} sem informações da faixa")
             IslandBus.music.value = null
             return
         }
         val title = md.getString(MediaMetadata.METADATA_KEY_TITLE)
             ?: md.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
         if (title.isNullOrBlank()) {
+            IslandBus.log("Música: ${c.packageName} sem título")
             IslandBus.music.value = null
             return
         }
@@ -154,7 +163,10 @@ class NotificationWatcher : NotificationListenerService() {
         val ranking = Ranking()
         if (currentRanking?.getRanking(sbn.key, ranking) == true &&
             ranking.importance < NotificationManager.IMPORTANCE_DEFAULT
-        ) return
+        ) {
+            IslandBus.log("Notificação silenciosa ignorada ($pkg)")
+            return
+        }
 
         val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return
         val text = (n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
@@ -177,6 +189,7 @@ class NotificationWatcher : NotificationListenerService() {
             null
         }
 
+        IslandBus.log("Notificação enviada à ilha: $app")
         IslandBus.notifs.tryEmit(NotifInfo(sbn.key, app, title, text, icon, n.contentIntent))
     }
 

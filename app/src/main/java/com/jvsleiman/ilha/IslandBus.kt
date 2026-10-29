@@ -18,7 +18,7 @@ data class MusicInfo(
     val positionTime: Long,
     val speed: Float,
     val duration: Long,
-    val controller: MediaController,
+    val controller: MediaController?,
 ) {
     fun currentPosition(now: Long = SystemClock.elapsedRealtime()): Long {
         val p = if (playing) position + ((now - positionTime) * speed).toLong() else position
@@ -40,4 +40,15 @@ data class NotifInfo(
 object IslandBus {
     val music = MutableStateFlow<MusicInfo?>(null)
     val notifs = MutableSharedFlow<NotifInfo>(extraBufferCapacity = 8)
+
+    // Diagnóstico (aparece na tela do app)
+    val serviceOn = MutableStateFlow(false)
+    val listenerOn = MutableStateFlow(false)
+    val lastEvent = MutableStateFlow("Nada ainda")
+
+    fun log(msg: String) {
+        val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        lastEvent.value = "$hora · $msg"
+    }
 }
