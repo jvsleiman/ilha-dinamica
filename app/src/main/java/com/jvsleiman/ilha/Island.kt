@@ -2,6 +2,13 @@ package com.jvsleiman.ilha
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -86,7 +93,9 @@ fun Island(
     onLongPress: () -> Unit,
     onAction: (String) -> Unit,
     onSwipe: (Boolean) -> Unit,
+    onFechar: () -> Unit,
 ) {
+    val fechar by rememberUpdatedState(onFechar)
     val tap by rememberUpdatedState(onTap)
     val swipe by rememberUpdatedState(onSwipe)
     val hold by rememberUpdatedState(onLongPress)
@@ -97,24 +106,63 @@ fun Island(
     val r by animateDpAsState(ui.r.dp, mola<Dp>(), label = "cantos")
     val y by animateFloatAsState(ui.y, mola<Float>(), label = "topo")
 
+    // Arrastar: a ilha acompanha o dedo. Curto = troca de música; longo para a esquerda = fecha.
+    val scope = rememberCoroutineScope()
+    val vibrar = LocalHapticFeedback.current
+    val arrasto = remember { Animatable(0f) }
+    val telaPx = LocalConfiguration.current.screenWidthDp * LocalDensity.current.density
+    val limite = telaPx * 0.3f
+    val podeFechar = ui.modo != Modo.IDLE
+    val progresso = (-arrasto.value / limite).coerceIn(0f, 1f)
+
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier
                 // Sempre centralizada na câmera, qualquer que seja a largura no momento
-                .offset { IntOffset((ui.cx + dx.toPx() - w.toPx() / 2f).roundToInt(), y.roundToInt()) }
+                .offset {
+                    IntOffset((ui.cx + dx.toPx() - w.toPx() / 2f + arrasto.value).roundToInt(), y.roundToInt())
+                }
+                .graphicsLayer {
+                    alpha = 1f - 0.55f * progresso
+                    scaleX = 1f - 0.12f * progresso
+                    scaleY = 1f - 0.12f * progresso
+                }
                 .size(w, h)
                 .clip(RoundedCornerShape(r))
                 .background(Color.Black)
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = { tap() }, onLongPress = { hold() })
                 }
-                // Deslizar para o lado: troca de música
-                .pointerInput(Unit) {
-                    var dx = 0f
+                .pointerInput(podeFechar) {
+                    var passou = false
+                    val volta = spring<Float>(dampingRatio = 0.72f, stiffness = 380f)
                     detectHorizontalDragGestures(
-                        onDragStart = { dx = 0f },
-                        onDragEnd = { if (abs(dx) > 48.dp.toPx()) swipe(dx > 0) },
-                        onHorizontalDrag = { change, d -> dx += d; change.consume() },
+                        onDragStart = { passou = false },
+                        onHorizontalDrag = { change, d ->
+                            change.consume()
+                            val atual = arrasto.value
+                            // para a direita tem resistência (só serve para voltar música)
+                            val novo = atual + if (atual + d > 0f) d * 0.35f else d
+                            scope.launch { arrasto.snapTo(novo) }
+                            val alem = podeFechar && -novo > limite
+                            if (alem && !passou) vibrar.performHapticFeedback(HapticFeedbackType.LongPress)
+                            passou = alem
+                        },
+                        onDragEnd = {
+                            val v = arrasto.value
+                            scope.launch {
+                                if (podeFechar && -v > limite) {
+                                    // sai voando para a esquerda e fecha
+                                    arrasto.animateTo(-telaPx, tween(180))
+                                    fechar()
+                                    arrasto.snapTo(0f)
+                                } else {
+                                    if (abs(v) > 48.dp.toPx()) swipe(v > 0)
+                                    arrasto.animateTo(0f, volta)
+                                }
+                            }
+                        },
+                        onDragCancel = { scope.launch { arrasto.animateTo(0f, volta) } },
                     )
                 },
         ) {

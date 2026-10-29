@@ -53,6 +53,8 @@ object IslandBus {
     val music = MutableStateFlow<MusicInfo?>(null)
     val notifs = MutableSharedFlow<NotifInfo>(extraBufferCapacity = 8)
     val removidas = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    /** Pedidos da ilha para apagar uma notificação (o leitor de notificações executa). */
+    val cancelar = MutableSharedFlow<String>(extraBufferCapacity = 8)
 
     /** Resposta que a tela de resposta deve enviar. */
     var reply: ReplyRequest? = null

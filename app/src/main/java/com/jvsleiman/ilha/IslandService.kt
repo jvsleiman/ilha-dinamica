@@ -135,6 +135,7 @@ class IslandService : AccessibilityService() {
                     onLongPress = { segurar() },
                     onAction = { acao(it) },
                     onSwipe = { deslizar(it) },
+                    onFechar = { fechar() },
                 )
             }
         }
@@ -377,6 +378,34 @@ class IslandService : AccessibilityService() {
         if (m != Modo.MUSIC_C && m != Modo.MUSIC_X) return
         val t = music?.controller?.transportControls ?: return
         if (direita) t.skipToPrevious() else t.skipToNext()
+    }
+
+    /**
+     * Arrastou a ilha toda para a esquerda: fecha o que está nela.
+     * Música: para a reprodução e tira da ilha. Notificação: apaga a notificação.
+     */
+    private fun fechar() {
+        when (ui.value.modo) {
+            Modo.MUSIC_C, Modo.MUSIC_X -> {
+                music?.controller?.transportControls?.let { t ->
+                    t.pause()
+                    t.stop()
+                }
+                hideMusicJob?.cancel()
+                musicVisible = false
+                expanded = false
+                bolhaJob?.cancel()
+                bolha = null
+                IslandBus.log("Música fechada pela ilha")
+            }
+            Modo.NOTIF, Modo.NOTIF_C, Modo.NOTIF_X -> {
+                notif?.let { IslandBus.cancelar.tryEmit(it.key) }
+                fecharNotif()
+                IslandBus.log("Notificação fechada pela ilha")
+            }
+            Modo.IDLE -> {}
+        }
+        refresh()
     }
 
     /** Abre o app dono da notificação/música. */

@@ -22,6 +22,8 @@ import androidx.core.graphics.drawable.toBitmap
 class NotificationWatcher : NotificationListenerService() {
 
     private var msm: MediaSessionManager? = null
+    private val scope = kotlinx.coroutines.MainScope()
+    private var cancelJob: kotlinx.coroutines.Job? = null
     private var current: MediaController? = null
     private val main = Handler(Looper.getMainLooper())
     private val lastText = HashMap<String, String>()
@@ -49,6 +51,13 @@ class NotificationWatcher : NotificationListenerService() {
         val m = getSystemService(MediaSessionManager::class.java)
         msm = m
         IslandBus.listenerOn.value = true
+        if (cancelJob?.isActive != true) {
+            cancelJob = scope.launch {
+                IslandBus.cancelar.collect { key ->
+                    try { cancelNotification(key) } catch (e: Exception) { IslandBus.log("Não consegui apagar: ${e.message}") }
+                }
+            }
+        }
         try {
             m.addOnActiveSessionsChangedListener(sessionsListener, cn, main)
             val list = m.getActiveSessions(cn)
@@ -66,6 +75,7 @@ class NotificationWatcher : NotificationListenerService() {
         current = null
         IslandBus.music.value = null
         IslandBus.listenerOn.value = false
+        cancelJob?.cancel()
         IslandBus.log("Leitor de notificações desconectado")
         super.onListenerDisconnected()
     }
