@@ -53,7 +53,18 @@ data class UiState(
     val contagem: Int = 0,
     val acima: Float = 8f,
     val alturaCamera: Float = 30f,
+    /** Ilha dividida: largura só da parte principal e deslocamento dela (dp). Sem divisão, wMain = w e dx = 0. */
+    val wMain: Float = 100f,
+    val dx: Float = 0f,
+    /** Notificação de outro app mostrada na bolinha (null = sem bolinha). */
+    val bolha: NotifInfo? = null,
+    val bolhaContagem: Int = 0,
 )
+
+/** Espaço entre a ilha principal e a bolinha, em dp. */
+const val ESPACO_BOLHA = 8f
+/** Quanto tempo a bolinha de notificação fica antes de a ilha voltar a ficar inteira. */
+private const val BOLHA_MS = 4_000L
 
 /** Margem interna padrão das formas expandidas: laterais e base iguais, em dp. */
 const val MARGEM_INTERNA = 20f
@@ -92,6 +103,9 @@ class IslandService : AccessibilityService() {
     private var contagem = 0
     private var hideMusicJob: Job? = null
     private var notifJob: Job? = null
+    private var bolha: NotifInfo? = null
+    private var bolhaContagem = 0
+    private var bolhaJob: Job? = null
 
     private val ui = mutableStateOf(UiState())
 
@@ -180,7 +194,14 @@ class IslandService : AccessibilityService() {
         }
         owner.lifecycleScope.launch {
             // Lida em outro lugar (ou apagada): tira da ilha
-            IslandBus.removidas.collect { key -> if (notif?.key == key && fase != Fase.ABERTA) fecharNotif() }
+            IslandBus.removidas.collect { key ->
+                if (bolha?.key == key) {
+                    bolhaJob?.cancel()
+                    bolha = null
+                    refresh()
+                }
+                if (notif?.key == key && fase != Fase.ABERTA) fecharNotif()
+            }
         }
     }
 
@@ -210,6 +231,19 @@ class IslandService : AccessibilityService() {
     }
 
     private fun onNotif(n: NotifInfo) {
+        // Música na ilha: a notificação vai para a bolinha ao lado, sem tirar a música
+        if (musicVisible && music != null && notif == null) {
+            bolhaContagem = if (bolha?.pkg == n.pkg) bolhaContagem + 1 else 1
+            bolha = n
+            bolhaJob?.cancel()
+            bolhaJob = owner.lifecycleScope.launch {
+                delay(BOLHA_MS)
+                bolha = null
+                refresh()
+            }
+            refresh()
+            return
+        }
         contagem = if (notif?.pkg == n.pkg) contagem + 1 else 1
         notif = n
         fase = Fase.FAIXA
@@ -271,6 +305,23 @@ class IslandService : AccessibilityService() {
     }
 
     private fun acao(a: String) {
+        if (a == "bolha" || a == "bolha_abrir") {
+            val b = bolha ?: return
+            bolhaJob?.cancel()
+            bolha = null
+            if (a == "bolha_abrir") {
+                abrir(b.intent)
+            } else {
+                // Toque na bolinha: a notificação vem para a ilha principal, já aberta
+                notif = b
+                contagem = bolhaContagem
+                fase = Fase.ABERTA
+                expanded = false
+                depois(12_000L) { pendente() }
+            }
+            refresh()
+            return
+        }
         if (a.startsWith("acao:")) {
             acaoNotif(a.removePrefix("acao:").toIntOrNull() ?: return)
             return
@@ -382,7 +433,15 @@ class IslandService : AccessibilityService() {
                 44f,
             )
         }
-        return UiState(modo, w, h, r, m, notif, ui.value.cx, topo, ui.value.y, contagem, cfg.acima, cfg.height)
+        // Ilha dividida: ocupa o mesmo espaço da ilha com música (nunca avança sobre os ícones da barra)
+        val b = bolha
+        val dividida = modo == Modo.MUSIC_C && b != null
+        val wMain = if (dividida) w - ESPACO_BOLHA - cfg.height else w
+        val dx = if (dividida) -(ESPACO_BOLHA + cfg.height) / 2f else 0f
+        return UiState(
+            modo, w, h, r, m, notif, ui.value.cx, topo, ui.value.y, contagem, cfg.acima, cfg.height,
+            wMain = wMain, dx = dx, bolha = b, bolhaContagem = bolhaContagem,
+        )
     }
 
     private fun refresh() {

@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,7 +91,8 @@ fun Island(
     val swipe by rememberUpdatedState(onSwipe)
     val hold by rememberUpdatedState(onLongPress)
 
-    val w by animateDpAsState(ui.w.dp, mola<Dp>(), label = "largura")
+    val w by animateDpAsState(ui.wMain.dp, mola<Dp>(), label = "largura")
+    val dx by animateDpAsState(ui.dx.dp, mola<Dp>(), label = "deslocamento")
     val h by animateDpAsState(ui.h.dp, mola<Dp>(), label = "altura")
     val r by animateDpAsState(ui.r.dp, mola<Dp>(), label = "cantos")
     val y by animateFloatAsState(ui.y, mola<Float>(), label = "topo")
@@ -99,7 +101,7 @@ fun Island(
         Box(
             Modifier
                 // Sempre centralizada na câmera, qualquer que seja a largura no momento
-                .offset { IntOffset((ui.cx - w.toPx() / 2f).roundToInt(), y.roundToInt()) }
+                .offset { IntOffset((ui.cx + dx.toPx() - w.toPx() / 2f).roundToInt(), y.roundToInt()) }
                 .size(w, h)
                 .clip(RoundedCornerShape(r))
                 .background(Color.Black)
@@ -122,7 +124,7 @@ fun Island(
                 targetState = ui.modo,
                 modifier = Modifier
                     .wrapContentSize(Alignment.TopCenter, unbounded = true)
-                    .requiredSize(ui.w.dp, ui.h.dp),
+                    .requiredSize(ui.wMain.dp, ui.h.dp),
                 contentAlignment = Alignment.TopCenter,
                 transitionSpec = {
                     (fadeIn(tween(220, delayMillis = 90)) +
@@ -148,6 +150,9 @@ fun Island(
             // Ícone do app: um elemento só que desliza entre faixa → lado da câmera → cabeçalho do cartão
             IconeCompartilhado(ui)
         }
+
+        // Bolinha da ilha dividida (fica fora da ilha principal)
+        Bolinha(ui, w, dx, y, onAction)
     }
 }
 
@@ -339,6 +344,68 @@ private fun IconeApp(bmp: android.graphics.Bitmap?, tamanho: Dp) {
         )
     } else {
         Box(Modifier.size(tamanho).clip(RoundedCornerShape(tamanho / 2)).background(Color(0xFF333333)))
+    }
+}
+
+/**
+ * Bolinha de um segundo app. Ela "nasce" de dentro da borda direita da ilha principal
+ * (pequena e invisível) e se separa até a posição final, como uma gota se soltando.
+ */
+@Composable
+private fun Bolinha(ui: UiState, wMain: Dp, dx: Dp, y: Float, onAction: (String) -> Unit) {
+    val acao by rememberUpdatedState(onAction)
+    var ultima by remember { mutableStateOf<NotifInfo?>(null) }
+    var qtd by remember { mutableStateOf(1) }
+    if (ui.bolha != null) { ultima = ui.bolha; qtd = ui.bolhaContagem }
+    val ativa = ui.bolha != null && ui.modo == Modo.MUSIC_C
+
+    val sep by animateFloatAsState(if (ativa) 1f else 0f, mola<Float>(), label = "separacao")
+    val n = ultima ?: return
+    if (sep < 0.01f && !ativa) return
+
+    val b = ui.alturaCamera.dp
+    Box(
+        Modifier
+            .offset {
+                val bordaDireita = ui.cx + dx.toPx() + wMain.toPx() / 2f
+                val dentro = bordaDireita - b.toPx()                       // colada por dentro da borda
+                val fora = bordaDireita + ESPACO_BOLHA.dp.toPx()          // posição final, 8 dp ao lado
+                IntOffset((dentro + (fora - dentro) * sep).roundToInt(), y.roundToInt())
+            }
+            .size(b)
+            .graphicsLayer {
+                val e = 0.3f + 0.7f * sep.coerceIn(0f, 1.2f)
+                scaleX = e; scaleY = e
+                alpha = sep.coerceIn(0f, 1f)
+            }
+            .clip(CircleShape)
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { acao("bolha") }, onLongPress = { acao("bolha_abrir") })
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        // Conteúdo só aparece depois que a bolinha já se separou ~60%
+        Box(Modifier.graphicsLayer { alpha = ((sep - 0.6f) / 0.4f).coerceIn(0f, 1f) }) {
+            IconeApp(n.appIcon ?: n.icon, 20.dp)
+        }
+    }
+    if (qtd > 1) {
+        Box(
+            Modifier
+                .offset {
+                    val bordaDireita = ui.cx + dx.toPx() + wMain.toPx() / 2f
+                    val fora = bordaDireita + ESPACO_BOLHA.dp.toPx() + b.toPx() - 11.dp.toPx()
+                    IntOffset(fora.roundToInt(), (y - 3.dp.toPx()).roundToInt())
+                }
+                .graphicsLayer { alpha = ((sep - 0.6f) / 0.4f).coerceIn(0f, 1f) }
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFF3B30)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("$qtd", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
