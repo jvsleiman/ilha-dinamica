@@ -374,16 +374,15 @@ private fun FaixaNotif(n: NotifInfo, contagem: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(Modifier.width(20.dp + 8.dp)) // lugar do ícone compartilhado
+        val qtd = contagem.coerceAtLeast(1)
+        // Como no iPhone: "Nome (1)" à esquerda e "Ver" na cor do app à direita
         Text(
-            n.app, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            "${n.title} ($qtd)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
         )
         Spacer(Modifier.weight(1f))
-        val qtd = contagem.coerceAtLeast(1)
-        Text(
-            if (qtd == 1) "1 nova mensagem" else "$qtd novas mensagens",
-            color = Color(n.accent), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1,
-        )
+        Spacer(Modifier.width(12.dp))
+        Text("Ver", color = Color(n.accent), fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -419,35 +418,37 @@ private fun CartaoNotif(n: NotifInfo, ui: UiState, onAction: (String) -> Unit) {
                 start = MARGEM_INTERNA.dp, end = MARGEM_INTERNA.dp, top = ui.topo.dp, bottom = MARGEM_INTERNA.dp,
             ),
         ) {
-            Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Pessoa: foto com bolinha "online", nome e horário
+            Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box {
-                    IconeApp(n.icon, 46.dp)
-                    // bolinha na cor do app, como "online"
+                    IconeApp(n.icon, 40.dp)
                     Box(
                         Modifier.align(Alignment.BottomEnd).size(12.dp).clip(RoundedCornerShape(6.dp))
                             .background(Color.Black).padding(2.dp).clip(RoundedCornerShape(4.dp)).background(accent),
                     )
                 }
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            n.title, color = Color.White, fontSize = 17.sp,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(hora, color = Cinza, fontSize = 12.sp)
-                    }
-                    if (n.text.isNotBlank()) {
-                        Text(
-                            n.text, color = Color(0xFFD1D1D6), fontSize = 13.sp,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    n.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(hora, color = Cinza, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(10.dp))
+            // Mensagem num balão, como no app
+            Box(
+                Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF2C2C2E)).padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    n.text.ifBlank { "Nova mensagem" }, color = Color.White, fontSize = 14.sp,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
             }
             if (n.actions.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     n.actions.forEachIndexed { i, a ->
                         Box(

@@ -66,9 +66,9 @@ const val MAX_H = 300f
 /** Quanto tempo a música pausada continua na ilha. */
 private const val PAUSA_VISIVEL_MS = 30_000L
 /** Quanto tempo o ícone de mensagem fica ao lado da câmera antes de a ilha voltar ao normal. */
-private const val PENDENTE_MS = 3_000L
+private const val PENDENTE_MS = 2_000L
 /** Quanto tempo a faixa "nova mensagem" fica aberta. */
-private const val NOTIF_MS = 4_500L
+private const val NOTIF_MS = 2_500L
 
 class IslandService : AccessibilityService() {
 
@@ -378,7 +378,7 @@ class IslandService : AccessibilityService() {
             // cabeçalho do app (na altura da câmera) + pessoa e mensagem + botões
             Modo.NOTIF_X -> Triple(
                 largo,
-                topo + 52f + (if (notif?.actions.isNullOrEmpty()) 0f else 16f + 36f) + base,
+                topo + 44f + 10f + 56f + (if (notif?.actions.isNullOrEmpty()) 0f else 14f + 36f) + base,
                 44f,
             )
         }
