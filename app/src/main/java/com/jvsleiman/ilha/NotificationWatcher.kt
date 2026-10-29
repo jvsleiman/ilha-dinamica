@@ -15,6 +15,7 @@ import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.launch
 
 /**
  * Lê as sessões de mídia (música) e as notificações novas e repassa para a ilha.
