@@ -120,8 +120,8 @@ fun Island(
                 when (modo) {
                     Modo.IDLE -> Box(Modifier.fillMaxSize())
                     Modo.MUSIC_C -> ui.music?.let { MusicaCompacta(it) }
-                    Modo.MUSIC_X -> ui.music?.let { MusicaExpandida(it, onAction) }
-                    Modo.NOTIF -> ui.notif?.let { Notificacao(it) }
+                    Modo.MUSIC_X -> ui.music?.let { MusicaExpandida(it, ui.topo, onAction) }
+                    Modo.NOTIF -> ui.notif?.let { Notificacao(it, ui.topo) }
                 }
             }
         }
@@ -190,7 +190,7 @@ private fun mmss(ms: Long): String {
 }
 
 @Composable
-private fun MusicaExpandida(m: MusicInfo, onAction: (String) -> Unit) {
+private fun MusicaExpandida(m: MusicInfo, topo: Float, onAction: (String) -> Unit) {
     var agora by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -201,7 +201,7 @@ private fun MusicaExpandida(m: MusicInfo, onAction: (String) -> Unit) {
     val pos = m.currentPosition(agora)
 
     Column(
-        Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 12.dp),
+        Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = topo.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -294,9 +294,9 @@ private fun Icone(tipo: IconeTipo, tamanho: Dp) {
 // ---------- notificação ----------
 
 @Composable
-private fun Notificacao(n: NotifInfo) {
+private fun Notificacao(n: NotifInfo, topo: Float) {
     Row(
-        Modifier.fillMaxSize().padding(start = 16.dp, end = 18.dp, top = 24.dp, bottom = 12.dp),
+        Modifier.fillMaxSize().padding(start = 18.dp, end = 18.dp, top = topo.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val bmp = n.icon
@@ -304,21 +304,21 @@ private fun Notificacao(n: NotifInfo) {
             val img = remember(bmp) { bmp.asImageBitmap() }
             Image(
                 img, contentDescription = null, contentScale = ContentScale.Crop,
-                modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)),
+                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)),
             )
         } else {
-            Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF333333)))
+            Box(Modifier.size(46.dp).clip(RoundedCornerShape(23.dp)).background(Color(0xFF333333)))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                n.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                n.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             if (n.text.isNotBlank()) {
                 Text(
-                    n.text, color = Cinza, fontSize = 13.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    n.text, color = Cinza, fontSize = 14.sp,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
             }
         }

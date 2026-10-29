@@ -38,10 +38,15 @@ data class UiState(
     val notif: NotifInfo? = null,
     /** Centro horizontal da câmera, em pixels da tela. */
     val cx: Float = 0f,
+    /** Faixa livre no topo das formas expandidas (a altura da ilha parada + respiro), em dp. */
+    val topo: Float = 38f,
 )
 
+/** Espaço entre a faixa da câmera e o conteúdo expandido, em dp. */
+const val RESPIRO = 10f
+
 /** Altura da maior forma da ilha (música expandida), em dp. */
-const val MAX_H = 176f
+const val MAX_H = 240f
 
 /** Quanto tempo a música pausada continua na ilha. */
 private const val PAUSA_VISIVEL_MS = 30_000L
@@ -262,13 +267,15 @@ class IslandService : AccessibilityService() {
         }
         if (modo == Modo.IDLE || modo == Modo.NOTIF) expanded = false
         val largo = screenWidthDp() - 24f
+        // O conteúdo expandido começa abaixo da câmera
+        val topo = cfg.height + RESPIRO
         val (w, h, r) = when (modo) {
             Modo.IDLE -> Triple(cfg.width, cfg.height, cfg.height / 2f)
             Modo.MUSIC_C -> Triple(cfg.width + 120f, cfg.height, cfg.height / 2f)
-            Modo.MUSIC_X -> Triple(largo, MAX_H, 42f)
-            Modo.NOTIF -> Triple(largo, 88f, 36f)
+            Modo.MUSIC_X -> Triple(largo, topo + 154f, 42f)
+            Modo.NOTIF -> Triple(largo, topo + 66f, 36f)
         }
-        return UiState(modo, w, h, r, m, notif, ui.value.cx)
+        return UiState(modo, w, h, r, m, notif, ui.value.cx, topo)
     }
 
     private fun refresh() {
