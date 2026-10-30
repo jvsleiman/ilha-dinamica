@@ -417,7 +417,7 @@ fun LazyListScope.telaAjustes(retorno: Int, a: Ajustes) {
     item {
         val cfg = a.cfg
         Secao("Comportamento") {
-            Chave("Esconder em tela cheia", "Vídeos e jogos sem barra de status. Chamada tocando aparece mesmo assim.", cfg.esconderTelaCheia) {
+            Chave("Esconder em tela cheia (experimental)", "Vídeos e jogos sem barra de status. Em alguns aparelhos a detecção falha; se a ilha sumir, desligue.", cfg.esconderTelaCheia) {
                 a.salvar(a.cfg.copy(esconderTelaCheia = it))
             }
             Chave("Esconder com o celular deitado", valor = cfg.esconderPaisagem) { a.salvar(a.cfg.copy(esconderPaisagem = it)) }

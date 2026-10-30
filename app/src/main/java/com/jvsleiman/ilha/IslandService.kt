@@ -261,7 +261,11 @@ class IslandService : AccessibilityService() {
         }
         val s = View(this).apply {
             setOnApplyWindowInsetsListener { _, insets ->
-                val cheia = !insets.isVisible(WindowInsets.Type.statusBars())
+                // Só conta como tela cheia se a barra de status existe para esta janela e está escondida.
+                // (Algumas janelas sobrepostas recebem a barra como "invisível" sempre — isso escondia a ilha.)
+                val tipo = WindowInsets.Type.statusBars()
+                val existe = insets.getInsetsIgnoringVisibility(tipo).top > 0
+                val cheia = existe && !insets.isVisible(tipo)
                 if (cheia != telaCheia) {
                     telaCheia = cheia
                     refresh()
@@ -306,7 +310,7 @@ class IslandService : AccessibilityService() {
         IslandBus.log("Ilha conectada")
         relatarTela()
 
-        ContextCompat.registerReceiver(
+        try { ContextCompat.registerReceiver(
             this, bateriaReceiver,
             IntentFilter().apply {
                 addAction(Intent.ACTION_POWER_CONNECTED)
@@ -314,7 +318,7 @@ class IslandService : AccessibilityService() {
                 addAction(Intent.ACTION_BATTERY_CHANGED)
             },
             ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
+        ) } catch (e: Exception) { IslandBus.log("Sem avisos de bateria: ${e.message}") }
 
         owner.lifecycleScope.launch { IslandBus.music.collect { m -> onMusic(m) } }
         owner.lifecycleScope.launch { IslandBus.notifs.collect { n -> onNotif(n) } }
@@ -960,6 +964,12 @@ class IslandService : AccessibilityService() {
         val escondida = !cfg.enabled ||
             (cfg.esconderPaisagem && paisagem) ||
             (cfg.esconderTelaCheia && telaCheia && !editando && s.modo != Modo.CALL_IN)
+        IslandBus.visibilidade.value = when {
+            !cfg.enabled -> "Escondida: \"Mostrar a ilha\" está desligado"
+            cfg.esconderPaisagem && paisagem -> "Escondida: celular deitado"
+            escondida -> "Escondida: tela cheia detectada"
+            else -> "Visível"
+        }
         val vis = if (escondida) View.GONE else View.VISIBLE
         v.visibility = vis
         t.visibility = vis

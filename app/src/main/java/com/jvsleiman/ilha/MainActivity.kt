@@ -58,6 +58,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -309,9 +310,13 @@ fun Diagnostico() {
     val musica by IslandBus.music.collectAsState()
     val lives by IslandBus.lives.collectAsState()
     val evento by IslandBus.lastEvent.collectAsState()
+    val visib by IslandBus.visibilidade.collectAsState()
+    val ctx = LocalContext.current
+    var erro by remember { mutableStateOf(Prefs.get(ctx).getString(App.ERRO, null)) }
 
     Secao("Diagnóstico") {
-        Linha("Ilha desenhando", if (servico) "Sim" else "Não", servico)
+        Linha("Serviço da ilha", if (servico) "Ligado" else "Desligado", servico)
+        if (servico) Text(visib, fontSize = 13.sp, color = if (visib == "Visível") Color(0xFF34C759) else MaterialTheme.colorScheme.error)
         Linha("Leitor de notificações", if (leitor) "Conectado" else "Desconectado", leitor)
         val m = musica
         Linha(
@@ -328,6 +333,18 @@ fun Diagnostico() {
             "Último evento: $evento", fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        val e = erro
+        if (e != null) {
+            Subtitulo("Último erro")
+            Text(e.take(1500), fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Erro D.I.A", e))
+                }) { Text("Copiar erro") }
+                TextButton(onClick = { Prefs.get(ctx).edit().remove(App.ERRO).apply(); erro = null }) { Text("Limpar") }
+            }
+        }
     }
 }
 

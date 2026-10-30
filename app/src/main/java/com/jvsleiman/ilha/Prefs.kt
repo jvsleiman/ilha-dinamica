@@ -52,7 +52,7 @@ data class Config(
     val atividades: Boolean = true,
     val timer: Boolean = true,
     // --- comportamento ---
-    val esconderTelaCheia: Boolean = true,
+    val esconderTelaCheia: Boolean = false,
     val esconderPaisagem: Boolean = true,
     /** Na tela bloqueada, não mostra o texto das notificações. */
     val privacidade: Boolean = true,
@@ -130,7 +130,7 @@ object Prefs {
         put("animOnda", c.animOnda); put("animBolha", c.animBolha)
         put("musica", c.musica); put("notificacoes", c.notificacoes); put("chamadas", c.chamadas)
         put("bateria", c.bateria); put("atividades", c.atividades); put("timer", c.timer)
-        put("esconderTelaCheia", c.esconderTelaCheia); put("esconderPaisagem", c.esconderPaisagem)
+        put("telaCheia2", c.esconderTelaCheia); put("esconderPaisagem", c.esconderPaisagem)
         put("privacidade", c.privacidade); put("deslizarTrocaMusica", c.deslizarTrocaMusica)
         put("prioridades", c.prioridades.joinToString(",") { it.name })
         put("ligarAoReiniciar", c.ligarAoReiniciar)
@@ -158,7 +158,7 @@ object Prefs {
             musica = b("musica", d.musica), notificacoes = b("notificacoes", d.notificacoes),
             chamadas = b("chamadas", d.chamadas), bateria = b("bateria", d.bateria),
             atividades = b("atividades", d.atividades), timer = b("timer", d.timer),
-            esconderTelaCheia = b("esconderTelaCheia", d.esconderTelaCheia),
+            esconderTelaCheia = b("telaCheia2", d.esconderTelaCheia),
             esconderPaisagem = b("esconderPaisagem", d.esconderPaisagem),
             privacidade = b("privacidade", d.privacidade),
             deslizarTrocaMusica = b("deslizarTrocaMusica", d.deslizarTrocaMusica),

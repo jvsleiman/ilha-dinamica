@@ -137,6 +137,8 @@ object IslandBus {
     val lastEvent = MutableStateFlow("Nada ainda")
     /** Geometria detectada da tela, para a tela de calibração. */
     val tela = MutableStateFlow("Ainda não detectada (ative a ilha)")
+    /** Se a ilha está visível agora e, se não, por quê. */
+    val visibilidade = MutableStateFlow("Serviço desligado")
 
     fun log(msg: String) {
         val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
