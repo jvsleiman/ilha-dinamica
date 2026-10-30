@@ -23,18 +23,33 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
+      - name: Testes
+        run: |
+          set -o pipefail
+          gradle testDebugUnitTest --no-daemon 2>&1 | tee testes.log
+
       - name: Compilar
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
+          set -o pipefail
           if [ -n "$KEYSTORE_PASSWORD" ]; then
-            gradle assembleRelease --no-daemon
+            gradle assembleRelease --no-daemon 2>&1 | tee build.log
             cp app/build/outputs/apk/release/app-release.apk IlhaDinamica.apk
           else
             echo "::warning::Sem o segredo KEYSTORE_PASSWORD: gerando APK de teste (assinatura temporária)"
-            gradle assembleDebug --no-daemon
+            gradle assembleDebug --no-daemon 2>&1 | tee build.log
             cp app/build/outputs/apk/debug/app-debug.apk IlhaDinamica.apk
           fi
+
+      # Erros do Kotlin viram anotações (aparecem no resumo da execução, mesmo sem abrir o log)
+      - name: Mostrar erros
+        if: failure()
+        run: |
+          cat testes.log build.log 2>/dev/null \
+            | grep -E '^e: |error:|FAILED|Exception|expected:<' \
+            | sed -E 's#file:///home/runner/work/[^/]+/[^/]+/##' \
+            | head -40 | while IFS= read -r l; do echo "::error::$l"; done
 
       - uses: actions/upload-artifact@v4
         with:
@@ -44,7 +59,10 @@ jobs:
       - name: Publicar versão
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.${{ github.run_number }}
-          name: Ilha Dinâmica v0.1.${{ github.run_number }}
-          body: Baixe o arquivo IlhaDinamica.apk abaixo e instale no celular.
+          tag_name: v0.3.${{ github.run_number }}
+          name: D.I.A v0.3.${{ github.run_number }}
+          body: |
+            ${{ github.event.head_commit.message }}
+
+            Baixe o arquivo IlhaDinamica.apk abaixo e instale no celular (ou use "Verificar atualizações" dentro do app).
           files: IlhaDinamica.apk
