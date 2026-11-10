@@ -229,8 +229,11 @@ object Updater {
     private const val TRABALHO = "verificar-atualizacao"
     const val CANAL = "atualizacoes"
 
-    /** Agenda (ou cancela, com 0 dias) a verificação automática. Roda só com internet. */
-    fun agendar(ctx: Context, dias: Int) {
+    /**
+     * Agenda (ou cancela, com 0 dias) a verificação automática. Roda só com internet.
+     * [manter] = true não reinicia a contagem se já estiver agendada (usado ao abrir o app).
+     */
+    fun agendar(ctx: Context, dias: Int, manter: Boolean = false) {
         val wm = WorkManager.getInstance(ctx)
         if (dias <= 0) {
             wm.cancelUniqueWork(TRABALHO)
@@ -239,7 +242,11 @@ object Updater {
         val req = PeriodicWorkRequestBuilder<VerificarAtualizacao>(dias.toLong(), TimeUnit.DAYS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-        wm.enqueueUniquePeriodicWork(TRABALHO, ExistingPeriodicWorkPolicy.UPDATE, req)
+        wm.enqueueUniquePeriodicWork(
+            TRABALHO,
+            if (manter) ExistingPeriodicWorkPolicy.KEEP else ExistingPeriodicWorkPolicy.UPDATE,
+            req,
+        )
     }
 
     fun avisar(ctx: Context, r: Release) {

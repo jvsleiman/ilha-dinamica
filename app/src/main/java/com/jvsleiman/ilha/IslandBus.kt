@@ -140,9 +140,22 @@ object IslandBus {
     /** Se a ilha está visível agora e, se não, por quê. */
     val visibilidade = MutableStateFlow("Serviço desligado")
 
+    /** Últimos eventos (o mais recente primeiro), para o registro no Diagnóstico. */
+    val historico = MutableStateFlow<List<String>>(emptyList())
+
     fun log(msg: String) {
         val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
             .format(java.util.Date())
-        lastEvent.value = "$hora · $msg"
+        val linha = "$hora · $msg"
+        lastEvent.value = linha
+        historico.value = (listOf(linha) + historico.value).take(40)
     }
+
+    /** Música de demonstração (sem app por trás: os controles são simulados pela própria ilha). */
+    fun musicaDeTeste() = MusicInfo(
+        title = "Música de teste", artist = "D.I.A", art = null,
+        accent = 0xFFFF9F7A.toInt(), playing = true, position = 0L,
+        positionTime = SystemClock.elapsedRealtime(), speed = 1f,
+        duration = 180_000L, controller = null,
+    )
 }
