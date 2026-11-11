@@ -12,7 +12,12 @@ informação, ela não aparece na ilha.
 ## Por que acessibilidade?
 Só uma janela de acessibilidade (`TYPE_ACCESSIBILITY_OVERLAY`) consegue ficar sobre a barra de status,
 em volta da câmera. O serviço não lê o conteúdo das telas (`canRetrieveWindowContent=false`) e não recebe
-eventos de digitação.
+nenhum evento de acessibilidade (nem qual app está aberto, nem digitação).
+
+## Privacidade
+- **Internet**: usada só pela atualização dentro do app, e só para endereços do GitHub (HTTPS). Notificações e música nunca saem do aparelho.
+- **Lista de apps**: o D.I.A só enxerga apps que têm ícone na gaveta, para mostrar nome e ícone nas notificações.
+- **Backup automático do Android**: desligado; as configurações não são copiadas para a nuvem. O backup manual em Ajustes continua funcionando.
 
 ## Integrações
 - **Chamadas**: atender/recusar só existem quando o app de chamadas oferece esses botões na notificação. Nome e foto vêm da própria notificação (sem acessar seus contatos).

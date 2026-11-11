@@ -104,9 +104,18 @@ object Updater {
         (0 until arr.length()).map { parse(arr.getJSONObject(it)) }
     }
 
+    /** O app só conversa com o GitHub: qualquer outro endereço é recusado. */
+    private fun exigirGitHub(link: String) {
+        val u = URL(link)
+        val host = u.host.lowercase()
+        val ok = u.protocol == "https" &&
+            (host == "github.com" || host.endsWith(".github.com") || host.endsWith(".githubusercontent.com"))
+        if (!ok) throw Exception("Download recusado: o endereço não é do GitHub.")
+    }
+
     suspend fun download(ctx: Context, url: String, progress: (Float) -> Unit): File =
         withContext(Dispatchers.IO) {
-            require(url.startsWith("https://")) { "Download recusado: o endereço não usa HTTPS." }
+            exigirGitHub(url)
             val file = File(ctx.cacheDir, "atualizacao.apk")
             var link = url
             var c: HttpURLConnection
@@ -121,7 +130,7 @@ object Updater {
                 if (code in 300..399 && tentativas < 5) {
                     link = c.getHeaderField("Location") ?: break
                     c.disconnect()
-                    if (!link.startsWith("https://")) throw Exception("Redirecionamento inseguro recusado.")
+                    exigirGitHub(link)
                     tentativas++
                     continue
                 }

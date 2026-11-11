@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Sem accessibilityEventTypes: o serviço não recebe nenhum evento das telas.
+     Ele existe só para poder desenhar a ilha sobre a barra de status. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:notificationTimeout="100"
     android:canRetrieveWindowContent="false"
     android:description="@string/acessibilidade_desc" />

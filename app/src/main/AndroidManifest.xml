@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Vibração ao terminar o temporizador e ao expandir -->
@@ -12,13 +11,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Para o botão "Atualizar agora" instalar a versão nova -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Para mostrar o nome e o ícone do app de cada notificação -->
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Sem QUERY_ALL_PACKAGES: o app só enxerga apps que têm ícone na gaveta
+         (os que mandam notificações), para mostrar nome e ícone. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:name=".App"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:label="D.I.A"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
