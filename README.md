@@ -26,7 +26,7 @@ Primeiro uso:
 | Temporizadores do app Relógio, navegação, downloads, gravação | Notificações em andamento com cronômetro ou progresso |
 | Ilha dividida (bolinha) com a 2ª atividade ou uma notificação de passagem | Gerenciador de prioridades configurável |
 
-Gestos: **toque** abre o app da atividade · **segurar** expande · **deslizar** alterna atividades
+Gestos (também explicados em **Ajustes → Ajuda**): **toque** abre o app da atividade (ou expande, se o app não indicar uma tela) · **segurar** expande · **deslizar** alterna atividades
 (ou troca a faixa, com só música) · **arrastar longe para a esquerda** fecha · **toque fora** recolhe.
 
 ## Personalização
@@ -34,6 +34,15 @@ Posição X/Y (arrastando na tela ou por ajuste fino), centralização automáti
 largura/altura/arredondamento, largura com atividade, raio e margens da forma expandida, opacidade,
 tamanho dos textos, escala dos ícones, velocidade e elasticidade das molas, tempos de permanência,
 favoritos, apps permitidos, ordem de prioridade, privacidade na tela bloqueada, backup local.
+
+## Testes e diagnóstico
+Em **Início → Testar na ilha de verdade**: notificação, música (com controles simulados), expandir, carregador,
+bateria fraca e timer. Sem a acessibilidade ligada, o app avisa em vez de ficar sem resposta.
+O **Diagnóstico** mostra o registro dos últimos eventos e copia um resumo para relatar problemas.
+
+## Compilação
+Cada envio para `main` gera e publica um APK. Pull requests só compilam e testam (o APK fica nos artefatos
+da execução), sem publicar versão.
 
 ## Arquitetura
 - `IslandService` — serviço de acessibilidade: janelas sobrepostas, estados, gestos, prioridades, bateria, temporizador.

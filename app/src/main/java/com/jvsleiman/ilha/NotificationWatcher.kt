@@ -39,7 +39,16 @@ class NotificationWatcher : NotificationListenerService() {
     private lateinit var prefs: SharedPreferences
     private var cfg = Config()
 
-    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { p, _ ->
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { p, k ->
+        when (k) {
+            // Bloqueou ou liberou um app: a música e as atividades dele saem (ou voltam) na hora
+            Prefs.BLOQUEADOS -> {
+                refreshSessions()
+                varrerAtivas()
+                return@OnSharedPreferenceChangeListener
+            }
+            Prefs.VISTOS, Prefs.EDITANDO, "favoritos", App.ERRO -> return@OnSharedPreferenceChangeListener
+        }
         val antes = cfg
         cfg = Prefs.read(p)
         if (antes.musica != cfg.musica) publish()

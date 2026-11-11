@@ -3,6 +3,8 @@ name: Gerar APK
 on:
   push:
     branches: [main]
+  # Pull requests só compilam e testam (o APK fica nos artefatos); não publicam versão
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -57,6 +59,7 @@ jobs:
           path: IlhaDinamica.apk
 
       - name: Publicar versão
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.3.${{ github.run_number }}

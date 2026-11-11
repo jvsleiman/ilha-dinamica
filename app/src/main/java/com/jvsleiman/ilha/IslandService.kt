@@ -429,8 +429,14 @@ class IslandService : AccessibilityService() {
     // ---------- bateria ----------
 
     private fun onBateria(i: Intent) {
-        if (!cfg.bateria) return
         val nivel = nivelBateria(i)
+        // O nível é acompanhado sempre (o teste "Carregador" usa o valor real), mesmo sem os avisos ligados
+        if (i.action == Intent.ACTION_BATTERY_CHANGED && !cfg.bateria) {
+            carregando = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+            if (nivel >= 0) ultimoNivel = nivel
+            return
+        }
+        if (!cfg.bateria) return
         when (i.action) {
             Intent.ACTION_POWER_CONNECTED -> {
                 val n = if (nivel >= 0) nivel else nivelBateria(registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
@@ -574,22 +580,24 @@ class IslandService : AccessibilityService() {
                 depois((cfg.tempoExpandida * 1000).toLong()) { pendente() }
             }
             Modo.NOTIF_X -> {
-                abrir(notif?.intent)
+                val n = notif
+                if (n != null) abrir(n.intent, n.pkg)
                 fecharNotif()
             }
-            // Como no iPhone: toque abre o app; segurar expande
-            Modo.MUSIC_C -> abrir(music?.controller?.sessionActivity)
+            // Como no iPhone: toque abre o app; segurar expande.
+            // Se não há app para abrir (player sem tela, música de teste), o toque expande.
+            Modo.MUSIC_C -> if (!abrir(music?.controller?.sessionActivity, music?.pkg)) expandir(true)
             Modo.MUSIC_X -> expandir(false)
             Modo.LIVE_C -> {
                 val l = primeiraLive()
-                if (l?.proprio != null) expandir(true) else abrir(l?.intent)
+                if (l?.proprio != null || !abrir(l?.intent, l?.pkg)) expandir(true)
             }
             Modo.LIVE_X -> {
                 val l = primeiraLive()
-                if (l?.proprio == null) abrir(l?.intent)
+                if (l?.proprio == null) abrir(l?.intent, l?.pkg)
                 expandir(false)
             }
-            Modo.CALL_IN -> abrir(primeiraLive()?.intent)
+            Modo.CALL_IN -> primeiraLive()?.let { abrir(it.intent, it.pkg) }
             Modo.ALERTA -> {
                 alertaJob?.cancel()
                 alerta = null
@@ -606,11 +614,11 @@ class IslandService : AccessibilityService() {
                 expandir(true)
             }
             Modo.MUSIC_X -> {
-                abrir(music?.controller?.sessionActivity)
+                abrir(music?.controller?.sessionActivity, music?.pkg)
                 expandir(false)
             }
             Modo.LIVE_X -> {
-                abrir(primeiraLive()?.intent)
+                primeiraLive()?.let { abrir(it.intent, it.pkg) }
                 expandir(false)
             }
             Modo.NOTIF, Modo.NOTIF_C -> {
@@ -649,7 +657,12 @@ class IslandService : AccessibilityService() {
             "timer:pausar" -> { IslandBus.pausarOuRetomar(); expandir(true); return }
             "timer:cancelar" -> { IslandBus.cancelarTimer(); expandir(false); refresh(); return }
         }
-        val t = music?.controller?.transportControls ?: return
+        val mus = music
+        if (mus != null && mus.controller == null) {
+            controlarMusicaDeTeste(mus, a)
+            return
+        }
+        val t = mus?.controller?.transportControls ?: return
         if (a.startsWith("seek:")) {
             val f = a.removePrefix("seek:").toFloatOrNull() ?: return
             val d = music?.duration ?: 0L
@@ -662,11 +675,29 @@ class IslandService : AccessibilityService() {
             "next" -> t.skipToNext()
             "prev" -> t.skipToPrevious()
             "app" -> {
-                abrir(music?.controller?.sessionActivity)
+                abrir(music?.controller?.sessionActivity, music?.pkg)
                 expandir(false)
                 refresh()
             }
         }
+    }
+
+    /** A música de teste não tem player por trás: a própria ilha simula os controles. */
+    private fun controlarMusicaDeTeste(m: MusicInfo, a: String) {
+        val agora = SystemClock.elapsedRealtime()
+        val nova = when {
+            a == "play" -> m.copy(playing = !m.playing, position = m.currentPosition(agora), positionTime = agora)
+            a == "next" || a == "prev" -> m.copy(position = 0L, positionTime = agora, playing = true)
+            a.startsWith("seek:") -> {
+                val f = a.removePrefix("seek:").toFloatOrNull() ?: return
+                m.copy(position = (f * m.duration).toLong(), positionTime = agora)
+            }
+            a == "app" -> { expandir(false); refresh(); return }
+            else -> return
+        }
+        IslandBus.music.value = nova
+        expandir(true)
+        refresh()
     }
 
     private fun tocarBolha(abrirApp: Boolean) {
@@ -675,7 +706,7 @@ class IslandService : AccessibilityService() {
             bolhaJob?.cancel()
             bolhaNotif = null
             if (abrirApp) {
-                abrir(bn.intent)
+                abrir(bn.intent, bn.pkg)
             } else {
                 // Toque na bolinha: a notificação vem para a ilha principal, já aberta
                 notif = bn
@@ -691,8 +722,8 @@ class IslandService : AccessibilityService() {
         val segunda = ativas().getOrNull(1) ?: return
         if (abrirApp) {
             when (segunda) {
-                is Ativ.Musica -> abrir(segunda.m.controller?.sessionActivity)
-                is Ativ.Viva -> abrir(segunda.l.intent)
+                is Ativ.Musica -> abrir(segunda.m.controller?.sessionActivity, segunda.m.pkg)
+                is Ativ.Viva -> abrir(segunda.l.intent, segunda.l.pkg)
             }
         } else {
             escolhida = segunda.key
@@ -739,7 +770,12 @@ class IslandService : AccessibilityService() {
         }
         val m = ui.value.modo
         if ((m == Modo.MUSIC_C || m == Modo.MUSIC_X) && cfg.deslizarTrocaMusica) {
-            val t = music?.controller?.transportControls ?: return
+            val mus = music ?: return
+            if (mus.controller == null) {
+                controlarMusicaDeTeste(mus, if (direita) "prev" else "next")
+                return
+            }
+            val t = mus.controller.transportControls
             if (direita) t.skipToPrevious() else t.skipToNext()
         }
     }
@@ -755,6 +791,7 @@ class IslandService : AccessibilityService() {
                     t.pause()
                     t.stop()
                 }
+                if (music?.controller == null) IslandBus.music.value = null
                 hideMusicJob?.cancel()
                 musicVisible = false
                 expandir(false)
@@ -796,20 +833,34 @@ class IslandService : AccessibilityService() {
         refresh()
     }
 
-    /** Abre o app dono da notificação/música. */
-    private fun abrir(pi: PendingIntent?) {
-        pi ?: return
-        try {
-            val opts = if (Build.VERSION.SDK_INT >= 34) {
-                ActivityOptions.makeBasic().apply {
-                    setPendingIntentBackgroundActivityStartMode(
-                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
-                    )
-                }.toBundle()
-            } else null
-            pi.send(this, 0, null, null, null, null, opts)
+    /**
+     * Abre o app dono da notificação/música. Usa a tela que o app indicou e, se ele não indicou
+     * (ou ela foi cancelada), abre o app pelo ícone. Retorna false se não havia nada para abrir.
+     */
+    private fun abrir(pi: PendingIntent?, pkg: String?): Boolean {
+        if (pi != null) {
+            try {
+                val opts = if (Build.VERSION.SDK_INT >= 34) {
+                    ActivityOptions.makeBasic().apply {
+                        setPendingIntentBackgroundActivityStartMode(
+                            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
+                        )
+                    }.toBundle()
+                } else null
+                pi.send(this, 0, null, null, null, null, opts)
+                return true
+            } catch (e: Exception) {
+                IslandBus.log("O app não aceitou abrir pela ilha; tentando pelo ícone")
+            }
+        }
+        if (pkg.isNullOrBlank()) return false
+        val lancar = try { packageManager.getLaunchIntentForPackage(pkg) } catch (e: Exception) { null } ?: return false
+        return try {
+            startActivity(lancar.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED))
+            true
         } catch (e: Exception) {
-            // app fechado ou intent cancelada: ignora
+            IslandBus.log("Não consegui abrir $pkg: ${e.message}")
+            false
         }
     }
 
@@ -820,12 +871,33 @@ class IslandService : AccessibilityService() {
             "carregando" -> mostrarAlerta(Alerta(AlertaTipo.CARREGANDO, "Carregando", "${ultimoNivel.coerceAtLeast(0)}%", 0xFF34C759.toInt(), ultimoNivel.coerceAtLeast(0) / 100f))
             "bateria" -> mostrarAlerta(Alerta(AlertaTipo.BAIXA, "Bateria fraca", "15%", 0xFFFF453A.toInt(), 0.15f), 4_000L)
             "timer" -> IslandBus.iniciarTimer(60_000L)
-            "notif" -> IslandBus.notifs.tryEmit(
-                NotifInfo("teste", "D.I.A", "Pré-visualização", "Assim fica uma notificação na ilha", null, null, pkg = "teste"),
-            )
-            "expandir" -> { if (ativas().isNotEmpty()) { expandir(true); refresh() } }
+            "notif" -> IslandBus.notifs.tryEmit(notifDeTeste())
+            "expandir" -> {
+                // Sem nada rodando, expande uma música de teste (antes o botão não fazia nada)
+                if (ativas().isEmpty() && cfg.musica) {
+                    val m = IslandBus.musicaDeTeste()
+                    IslandBus.music.value = m
+                    onMusic(m)
+                }
+                if (ativas().isNotEmpty()) {
+                    expandir(true)
+                } else {
+                    // Música desligada em Atividades: mostra o cartão de notificação aberto
+                    notif = notifDeTeste()
+                    contagem = 1
+                    fase = Fase.ABERTA
+                    depois((cfg.tempoExpandida * 1000).toLong()) { pendente() }
+                }
+                refresh()
+            }
         }
+        IslandBus.log("Teste: $d")
     }
+
+    private fun notifDeTeste() = NotifInfo(
+        "teste", "D.I.A", "Pré-visualização", "Assim fica uma notificação na ilha", null, null, pkg = "teste",
+        time = System.currentTimeMillis(),
+    )
 
     // ---------- layout ----------
 
